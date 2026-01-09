@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Panel Usuario</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Medidor: {{ meter.meter_code }}</h1>
+        <div class="muted">
+          Categoría: <b>{{ meter.category }}</b> —
+          Dirección: {{ meter.barrio }}, {{ meter.calle }}, {{ meter.numero }}
+        </div>
+      </div>
+      <a class="btn-outline" href="/">Salir</a>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Flujo actual</h2>
+        <div class="big">
+          <span id="flow">{{ flow_lps }}</span> <span class="unit">L/s</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Litros acumulados</h2>
+        <div class="big">
+          <span id="total">{{ liters_total }}</span> <span class="unit">L</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Última actualización</h2>
+        <div class="big" id="last_ts">{{ last_ts }}</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Lecturas recientes</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Fecha/Hora</th>
+            <th>Flujo (L/s)</th>
+            <th>Litros Delta</th>
+            <th>Litros Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in recent %}
+          <tr>
+            <td>{{ r.timestamp }}</td>
+            <td>{{ r.flow_lps }}</td>
+            <td>{{ r.liters_delta }}</td>
+            <td>{{ r.liters_total }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- WebSocket: actualiza la página sin F5 -->
+  <script>
+    const meterCode = "{{ meter.meter_code }}";
+    const wsUrl = `ws://${location.host}/ws/meter/${meterCode}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => console.log("🟢 WebSocket conectado:", wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.flow_lps !== undefined) {
+          document.getElementById("flow").innerText = Number(data.flow_lps).toFixed(3);
+        }
+        if (data.liters_total !== undefined) {
+          document.getElementById("total").innerText = Number(data.liters_total).toFixed(3);
+        }
+        if (data.timestamp) {
+          document.getElementById("last_ts").innerText = data.timestamp;
+        }
+      } catch (e) {
+        console.log("⚠️ Mensaje WS no válido:", event.data);
+      }
+    };
+
+    ws.onclose = () => console.log("🔴 WebSocket desconectado");
+    ws.onerror = (e) => console.log("❌ WebSocket error:", e);
+  </script>
+</body>
+</html>

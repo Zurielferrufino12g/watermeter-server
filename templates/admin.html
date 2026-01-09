@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Panel Admin</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="wrap">
+    <h1>Panel Admin</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Categoría</th>
+          <th>Dirección</th>
+          <th>Ver</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for m in meters %}
+        <tr>
+          <td>{{ m.meter_code }}</td>
+          <td>{{ m.category }}</td>
+          <td>{{ m.barrio }}, {{ m.calle }}, {{ m.numero }}</td>
+          <td><a href="/meter/{{ m.meter_code }}?pin={{ m.pin }}">Abrir</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
