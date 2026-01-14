@@ -2,9 +2,12 @@ from fastapi import FastAPI, Depends, HTTPException, Request, Form, WebSocket, W
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
 from sqlalchemy.orm import Session
 from datetime import datetime
 import asyncio
+import secrets
 from typing import Dict, Set
 
 from db import engine, SessionLocal
@@ -18,6 +21,24 @@ templates = Jinja2Templates(directory="templates")
 
 # DB tables
 Base.metadata.create_all(bind=engine)
+
+# =========================
+# ADMIN BASIC AUTH (admin/admin)
+# =========================
+security = HTTPBasic()
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin"
+
+def require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> bool:
+    ok_user = secrets.compare_digest(credentials.username, ADMIN_USER)
+    ok_pass = secrets.compare_digest(credentials.password, ADMIN_PASS)
+    if not (ok_user and ok_pass):
+        raise HTTPException(
+            status_code=401,
+            detail="No autorizado",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return True
 
 
 # =========================
@@ -152,8 +173,13 @@ def do_login(meter_code: str = Form(...), pin: str = Form(...), db: Session = De
     return RedirectResponse(url=f"/meter/{m.meter_code}?pin={pin}", status_code=303)
 
 
+# ✅ ADMIN PROTEGIDO: pedirá usuario/contraseña
 @app.get("/admin", response_class=HTMLResponse)
-def admin_page(request: Request, db: Session = Depends(get_db)):
+def admin_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_admin)
+):
     meters = db.query(Meter).all()
     return templates.TemplateResponse("admin.html", {"request": request, "meters": meters})
 
@@ -211,7 +237,6 @@ async def ingest(data: dict, db: Session = Depends(get_db)):
     flow_lps = float(data.get("flow_lps", 0))
     liters_delta = float(data.get("liters_delta", 0))
     liters_total = float(data.get("liters_total", 0))
-
     now = datetime.now()
 
     reading = Reading(
