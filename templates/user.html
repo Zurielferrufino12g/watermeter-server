@@ -16,6 +16,7 @@
           Categoría: <b>{{ meter.category }}</b> —
           Dirección: {{ meter.barrio }}, {{ meter.calle }}, {{ meter.numero }}
         </div>
+        <div class="muted" id="ws_status">WS: conectando…</div>
       </div>
       <a class="btn-outline" href="/">Salir</a>
     </div>
@@ -66,34 +67,68 @@
     </div>
   </div>
 
-  <!-- WebSocket: actualiza la página sin F5 -->
+  <!-- WebSocket: actualiza la página sin F5 (compatible con HTTPS/WSS) -->
   <script>
     const meterCode = "{{ meter.meter_code }}";
-    const wsUrl = `ws://${location.host}/ws/meter/${meterCode}`;
-    const ws = new WebSocket(wsUrl);
 
-    ws.onopen = () => console.log("🟢 WebSocket conectado:", wsUrl);
+    const elFlow  = document.getElementById("flow");
+    const elTotal = document.getElementById("total");
+    const elLast  = document.getElementById("last_ts");
+    const elWs    = document.getElementById("ws_status");
 
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
+    function setWsStatus(txt) {
+      if (elWs) elWs.innerText = txt;
+    }
 
-        if (data.flow_lps !== undefined) {
-          document.getElementById("flow").innerText = Number(data.flow_lps).toFixed(3);
+    function connectWS() {
+      // ✅ Si la página es https -> usamos wss. Si es http -> usamos ws.
+      const proto = (window.location.protocol === "https:") ? "wss" : "ws";
+      const wsUrl = `${proto}://${window.location.host}/ws/meter/${meterCode}`;
+
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("🟢 WebSocket conectado:", wsUrl);
+        setWsStatus("WS: 🟢 conectado");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          // Ignora el mensaje inicial del servidor
+          if (data.status === "connected") return;
+
+          if (data.flow_lps !== undefined && elFlow) {
+            elFlow.innerText = Number(data.flow_lps).toFixed(3);
+          }
+          if (data.liters_total !== undefined && elTotal) {
+            elTotal.innerText = Number(data.liters_total).toFixed(3);
+          }
+          if (data.timestamp && elLast) {
+            elLast.innerText = data.timestamp;
+          }
+        } catch (e) {
+          console.log("⚠️ Mensaje WS no válido:", event.data);
         }
-        if (data.liters_total !== undefined) {
-          document.getElementById("total").innerText = Number(data.liters_total).toFixed(3);
-        }
-        if (data.timestamp) {
-          document.getElementById("last_ts").innerText = data.timestamp;
-        }
-      } catch (e) {
-        console.log("⚠️ Mensaje WS no válido:", event.data);
-      }
-    };
+      };
 
-    ws.onclose = () => console.log("🔴 WebSocket desconectado");
-    ws.onerror = (e) => console.log("❌ WebSocket error:", e);
+      ws.onerror = (e) => {
+        console.log("❌ WebSocket error:", e);
+        // fuerza cierre para que dispare reconnect
+        try { ws.close(); } catch (_) {}
+      };
+
+      ws.onclose = () => {
+        console.log("🔴 WebSocket desconectado (reintentando...)");
+        setWsStatus("WS: 🔴 desconectado (reconectando…)");
+
+        // Reintento en 1 segundo
+        setTimeout(connectWS, 1000);
+      };
+    }
+
+    connectWS();
   </script>
 </body>
 </html>
