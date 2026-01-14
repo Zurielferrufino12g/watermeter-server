@@ -6,23 +6,42 @@
   <title>Ingreso - Medidor</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
+
 <body>
-  <div class="card">
-    <h1>Ingreso al Medidor</h1>
+  <div class="wrap" style="max-width:520px;">
+    <div class="topbar" style="justify-content:center; text-align:center;">
+      <div>
+        <h1 style="margin:0;">Ingreso al Medidor</h1>
+        <div class="muted" style="margin-top:6px;">
+          Escribe tu <b>código</b> y <b>PIN</b> para ver tu consumo en tiempo real.
+        </div>
+      </div>
+    </div>
 
-    {% if error %}
-      <div class="error">Código o PIN incorrecto</div>
-    {% endif %}
+    <div class="card">
+      {% if error %}
+        <div class="error">Código o PIN incorrecto</div>
+      {% endif %}
 
-    <form method="post" action="/login">
-      <label>Código del Medidor</label>
-      <input name="meter_code" required />
+      <form method="post" action="/login">
+        <label>Código del Medidor</label>
+        <input name="meter_code" placeholder="Ej: MED-001A" required />
 
-      <label>PIN</label>
-      <input name="pin" required />
+        <label>PIN</label>
+        <input name="pin" placeholder="Ej: 1111" required />
 
-      <button type="submit">Entrar</button>
-    </form>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+          <button type="submit">Login</button>
+          <button type="submit" style="background:rgba(255,255,255,.08); color:rgba(255,255,255,.92); border:1px solid rgba(255,255,255,.12); box-shadow:none;">
+            Sign in
+          </button>
+        </div>
+
+        <div class="muted" style="margin-top:14px; text-align:center;">
+          Admin: <a href="/admin">Panel Admin</a>
+        </div>
+      </form>
+    </div>
   </div>
 </body>
 </html>

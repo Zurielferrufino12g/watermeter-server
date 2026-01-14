@@ -6,29 +6,99 @@
   <title>Panel Admin</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
+
 <body>
   <div class="wrap">
-    <h1>Panel Admin</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Categoría</th>
-          <th>Dirección</th>
-          <th>Ver</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for m in meters %}
-        <tr>
-          <td>{{ m.meter_code }}</td>
-          <td>{{ m.category }}</td>
-          <td>{{ m.barrio }}, {{ m.calle }}, {{ m.numero }}</td>
-          <td><a href="/meter/{{ m.meter_code }}?pin={{ m.pin }}">Abrir</a></td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <div class="topbar">
+      <div>
+        <h1 style="margin:0;">Panel Admin</h1>
+        <div class="muted" style="margin-top:6px;">
+          Gestiona medidores y abre el panel de cada usuario.
+        </div>
+        <div class="muted" style="margin-top:10px;">
+          <a href="/" class="btn-outline" style="display:inline-flex; gap:8px;">← Volver al Login</a>
+        </div>
+      </div>
+
+      <div style="display:flex; gap:10px; align-items:center;">
+        <div style="text-align:right;">
+          <div class="muted">Total medidores</div>
+          <div class="big" style="font-size:20px;"><span id="count">{{ meters|length }}</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div>
+          <h2 style="margin:0; color:rgba(255,255,255,.82); font-size:15px;">Listado</h2>
+          <div class="muted" style="margin-top:4px;">Busca por código, categoría o dirección.</div>
+        </div>
+
+        <div style="min-width:260px; max-width:420px; width:100%;">
+          <input id="search" placeholder="Buscar… (ej: MED-001A / DOMESTICA / Cobija)" />
+        </div>
+      </div>
+
+      <table id="metersTable">
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Categoría</th>
+            <th>Dirección</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody id="metersBody">
+          {% for m in meters %}
+          <tr>
+            <td><b class="code">{{ m.meter_code }}</b></td>
+            <td class="cat">{{ m.category }}</td>
+            <td class="addr">{{ m.barrio }}, {{ m.calle }}, {{ m.numero }}</td>
+            <td>
+              <a class="btn-outline" href="/meter/{{ m.meter_code }}?pin={{ m.pin }}" style="padding:8px 12px; border-radius:12px;">
+                Abrir
+              </a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="muted" style="margin-top:12px;">
+        Tip: puedes copiar el enlace “Abrir” y enviarlo al jurado para probar desde su celular.
+      </div>
+    </div>
   </div>
+
+  <script>
+    // Buscador simple en tabla
+    const search = document.getElementById("search");
+    const tbody = document.getElementById("metersBody");
+    const rows = Array.from(tbody.querySelectorAll("tr"));
+    const countEl = document.getElementById("count");
+
+    function normalize(s){
+      return (s || "").toString().toLowerCase();
+    }
+
+    function filterRows(){
+      const q = normalize(search.value);
+      let visible = 0;
+
+      rows.forEach(r => {
+        const code = normalize(r.querySelector(".code")?.innerText);
+        const cat  = normalize(r.querySelector(".cat")?.innerText);
+        const addr = normalize(r.querySelector(".addr")?.innerText);
+        const ok = (code.includes(q) || cat.includes(q) || addr.includes(q) || q === "");
+        r.style.display = ok ? "" : "none";
+        if (ok) visible++;
+      });
+
+      if (countEl) countEl.innerText = visible;
+    }
+
+    search.addEventListener("input", filterRows);
+  </script>
 </body>
 </html>
