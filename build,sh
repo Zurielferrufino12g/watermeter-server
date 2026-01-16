@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -e
+
+echo "==> Installing frontend deps"
+cd frontend
+npm install
+
+echo "==> Building frontend"
+npm run build
+
+echo "==> Copying dist -> dashboard"
+cd ..
+rm -rf dashboard
+mkdir -p dashboard
+cp -r frontend/dist/* dashboard/
+
+echo "==> Build done"
