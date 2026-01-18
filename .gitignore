@@ -1,2 +1,26 @@
-watermeter.db
+# ======================
+# BASE DE DATOS
+# ======================
 *.db
+
+# ======================
+# NODE / FRONTEND
+# ======================
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+
+# ======================
+# PYTHON
+# ======================
+__pycache__/
+*.pyc
+*.pyo
+
+# ======================
+# ENV / SISTEMA
+# ======================
+.env
+.DS_Store
+Thumbs.db
