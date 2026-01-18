@@ -4,6 +4,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
+# ✅ ADDED (CORS)
+from fastapi.middleware.cors import CORSMiddleware
+
 from sqlalchemy.orm import Session
 from datetime import datetime
 import asyncio
@@ -14,6 +17,21 @@ from db import engine, SessionLocal
 from models import Base, User, Meter, Reading
 
 app = FastAPI()
+
+# ✅ ADDED (CORS) - para que el Static Site pueda hacer fetch al backend
+# Si no sabes tu dominio exacto del static site, deja "*" por ahora.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "*"
+        # Si quieres restringirlo después, usa esto en vez de "*":
+        # "https://watermeter-server-1.onrender.com",
+        # "http://localhost:5173",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Static + Templates
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -220,6 +238,62 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
             "recent": recent,
         },
     )
+
+
+# =========================
+# ✅ ADDED: 5.1) API JSON PARA FRONTEND (DASHBOARD REACT)
+# =========================
+@app.get("/api/meter/{meter_code}/latest")
+def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
+    m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
+    if not m or m.pin != pin:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    last = (
+        db.query(Reading)
+        .filter(Reading.meter_id == m.id)
+        .order_by(Reading.timestamp.desc())
+        .first()
+    )
+
+    return {
+        "meter_code": m.meter_code,
+        "category": m.category,
+        "barrio": m.barrio,
+        "calle": m.calle,
+        "numero": m.numero,
+        "flow_lps": float(last.flow_lps) if last else 0.0,
+        "liters_total": float(last.liters_total) if last else 0.0,
+        "timestamp": last.timestamp.strftime("%Y-%m-%d %H:%M:%S") if last else None,
+    }
+
+
+@app.get("/api/meter/{meter_code}/recent")
+def api_meter_recent(meter_code: str, pin: str, limit: int = 10, db: Session = Depends(get_db)):
+    m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
+    if not m or m.pin != pin:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    rows = (
+        db.query(Reading)
+        .filter(Reading.meter_id == m.id)
+        .order_by(Reading.timestamp.desc())
+        .limit(max(1, min(limit, 50)))
+        .all()
+    )
+
+    return {
+        "meter_code": m.meter_code,
+        "recent": [
+            {
+                "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "flow_lps": float(r.flow_lps),
+                "liters_delta": float(r.liters_delta),
+                "liters_total": float(r.liters_total),
+            }
+            for r in rows
+        ],
+    }
 
 
 # =========================
