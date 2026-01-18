@@ -38,7 +38,7 @@ export default function App() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 2000); // cada 2s
+    const t = setInterval(load, 1000); // cada 2s
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
