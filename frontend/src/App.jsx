@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = "https://watermeter-server.onrender.com";
+const WS_BASE = "wss://watermeter-server.onrender.com";
 
 function getParam(name, fallback) {
   const params = new URLSearchParams(window.location.search);
@@ -14,40 +15,125 @@ export default function App() {
   const [latest, setLatest] = useState(null);
   const [recent, setRecent] = useState([]);
   const [err, setErr] = useState("");
+  const [wsStatus, setWsStatus] = useState("connecting"); // connecting | connected | closed
 
-  async function load() {
-    try {
-      setErr("");
-      const [a, b] = await Promise.all([
-        fetch(`${API_BASE}/api/meter/${encodeURIComponent(meter)}/latest?pin=${encodeURIComponent(pin)}`),
-        fetch(`${API_BASE}/api/meter/${encodeURIComponent(meter)}/recent?pin=${encodeURIComponent(pin)}&limit=10`)
-      ]);
+  const wsRef = useRef(null);
 
-      if (!a.ok) throw new Error(`latest HTTP ${a.status}`);
-      if (!b.ok) throw new Error(`recent HTTP ${b.status}`);
-
-      const latestJson = await a.json();
-      const recentJson = await b.json();
-
-      setLatest(latestJson);
-      setRecent(recentJson.recent || []);
-    } catch (e) {
-      setErr(String(e));
-    }
-  }
-
+  // ✅ 1) Carga inicial (1 sola vez): latest + recent
   useEffect(() => {
-    load();
-    const t = setInterval(load, 1000); // cada 2s
+    let alive = true;
+    const controller = new AbortController();
+
+    async function initLoad() {
+      try {
+        setErr("");
+
+        const [a, b] = await Promise.all([
+          fetch(`${API_BASE}/api/meter/${encodeURIComponent(meter)}/latest?pin=${encodeURIComponent(pin)}`, {
+            signal: controller.signal,
+          }),
+          fetch(`${API_BASE}/api/meter/${encodeURIComponent(meter)}/recent?pin=${encodeURIComponent(pin)}&limit=10`, {
+            signal: controller.signal,
+          }),
+        ]);
+
+        if (!a.ok) throw new Error(`latest HTTP ${a.status}`);
+        if (!b.ok) throw new Error(`recent HTTP ${b.status}`);
+
+        const latestJson = await a.json();
+        const recentJson = await b.json();
+
+        if (!alive) return;
+        setLatest(latestJson);
+        setRecent(recentJson.recent || []);
+      } catch (e) {
+        if (!alive) return;
+        if (String(e).includes("AbortError")) return;
+        setErr(String(e));
+      }
+    }
+
+    initLoad();
+
+    return () => {
+      alive = false;
+      controller.abort();
+    };
+  }, [meter, pin]);
+
+  // ✅ 2) WebSocket: actualiza cada segundo SIN requests
+  useEffect(() => {
+    setWsStatus("connecting");
+    setErr("");
+
+    const ws = new WebSocket(`${WS_BASE}/ws/meter/${encodeURIComponent(meter)}`);
+    wsRef.current = ws;
+
+    ws.onopen = () => setWsStatus("connected");
+    ws.onclose = () => setWsStatus("closed");
+
+    ws.onerror = () => {
+      // si WS falla, no mates la app; solo avisa
+      setWsStatus("closed");
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        // Mensaje inicial del servidor trae status=connected
+        if (data.status === "connected") return;
+
+        // Actualiza latest (solo campos de lectura)
+        setLatest((prev) => ({
+          ...(prev || {}),
+          meter_code: meter,
+          flow_lps: Number(data.flow_lps ?? prev?.flow_lps ?? 0),
+          liters_total: Number(data.liters_total ?? prev?.liters_total ?? 0),
+          timestamp: data.timestamp ?? prev?.timestamp ?? null,
+        }));
+
+        // Inserta al inicio de la tabla (máx 10 filas)
+        setRecent((prev) => {
+          const row = {
+            timestamp: data.timestamp,
+            flow_lps: Number(data.flow_lps ?? 0),
+            liters_delta: Number(data.liters_delta ?? 0),
+            liters_total: Number(data.liters_total ?? 0),
+          };
+          const next = [row, ...prev];
+          return next.slice(0, 10);
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    return () => {
+      try {
+        ws.close();
+      } catch {}
+    };
+  }, [meter]);
+
+  // ✅ 3) “Reconciliación” opcional: cada 60s actualiza recent (muy bajo consumo)
+  useEffect(() => {
+    const t = setInterval(async () => {
+      try {
+        const res = await fetch(
+          `${API_BASE}/api/meter/${encodeURIComponent(meter)}/recent?pin=${encodeURIComponent(pin)}&limit=10`
+        );
+        if (!res.ok) return;
+        const json = await res.json();
+        setRecent(json.recent || []);
+      } catch {}
+    }, 60000); // 60s
+
     return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [meter, pin]);
 
   const card = (title, value, unit) => (
-    <div style={{
-      padding: 18, borderRadius: 14, border: "1px solid rgba(0,0,0,0.08)",
-      background: "white", boxShadow: "0 8px 30px rgba(0,0,0,0.06)"
-    }}>
+    <div style={{ padding: 18, borderRadius: 14, border: "1px solid rgba(0,0,0,0.08)", background: "white" }}>
       <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 8 }}>{title}</div>
       <div style={{ fontSize: 28, fontWeight: 800 }}>
         {value} <span style={{ fontSize: 14, fontWeight: 700, opacity: 0.6 }}>{unit}</span>
@@ -57,51 +143,65 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh", background: "#0b1220", color: "#e5e7eb", padding: 22 }}>
-      <div style={{
-        maxWidth: 1100, margin: "0 auto", background: "rgba(255,255,255,0.06)",
-        border: "1px solid rgba(255,255,255,0.08)", borderRadius: 18, padding: 18
-      }}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: 26, fontWeight: 900 }}>Medidor: {meter}</div>
-            {latest && (
-              <div style={{ opacity: 0.8, marginTop: 4 }}>
-                Categoría: <b>{latest.category}</b> — Dirección: {latest.barrio}, {latest.calle}, {latest.numero}
-              </div>
-            )}
-          </div>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 18,
+            padding: 18,
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 26, fontWeight: 900 }}>Medidor: {meter}</div>
+              {latest && (
+                <div style={{ opacity: 0.8, marginTop: 4 }}>
+                  Categoría: <b>{latest.category}</b> — Dirección: {latest.barrio}, {latest.calle}, {latest.numero}
+                </div>
+              )}
+            </div>
 
-          <div style={{ alignSelf: "center", opacity: 0.8 }}>
-            {latest?.timestamp ? `Última actualización: ${latest.timestamp}` : "Sin lecturas aún"}
+            <div style={{ alignSelf: "center", opacity: 0.9 }}>
+              WS:{" "}
+              <b style={{ color: wsStatus === "connected" ? "#22c55e" : "#f97316" }}>
+                {wsStatus}
+              </b>
+              <div style={{ opacity: 0.8, marginTop: 6 }}>
+                {latest?.timestamp ? `Última actualización: ${latest.timestamp}` : "Sin lecturas aún"}
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div style={{ maxWidth: 1100, margin: "18px auto 0" }}>
         {err && (
-          <div style={{ background: "#7f1d1d", padding: 12, borderRadius: 12 }}>
+          <div style={{ background: "#7f1d1d", padding: 12, borderRadius: 12, marginTop: 14 }}>
             Error: {err}
           </div>
         )}
 
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-          gap: 14,
-          marginTop: 14
-        }}>
-          {card("Flujo actual", latest ? Number(latest.flow_lps).toFixed(3) : "0.000", "L/s")}
-          {card("Litros acumulados", latest ? Number(latest.liters_total).toFixed(3) : "0.000", "L")}
-          {card("Estado", "Conectado", "OK")}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+            gap: 14,
+            marginTop: 14,
+          }}
+        >
+          {card("Flujo actual", latest ? Number(latest.flow_lps ?? 0).toFixed(3) : "0.000", "L/s")}
+          {card("Litros acumulados", latest ? Number(latest.liters_total ?? 0).toFixed(3) : "0.000", "L")}
+          {card("Estado", wsStatus === "connected" ? "Conectado" : "Reconectando", wsStatus === "connected" ? "OK" : "...")}
         </div>
 
-        <div style={{
-          marginTop: 18,
-          background: "rgba(255,255,255,0.06)",
-          border: "1px solid rgba(255,255,255,0.08)",
-          borderRadius: 18,
-          padding: 16
-        }}>
+        <div
+          style={{
+            marginTop: 18,
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 18,
+            padding: 16,
+          }}
+        >
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Lecturas recientes</div>
 
           <div style={{ overflowX: "auto" }}>
@@ -117,7 +217,9 @@ export default function App() {
               <tbody>
                 {recent.length === 0 && (
                   <tr>
-                    <td colSpan={4} style={{ padding: 10, opacity: 0.7 }}>Sin lecturas aún…</td>
+                    <td colSpan={4} style={{ padding: 10, opacity: 0.7 }}>
+                      Sin lecturas aún…
+                    </td>
                   </tr>
                 )}
                 {recent.map((r, i) => (
