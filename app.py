@@ -3,8 +3,6 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
-# ✅ ADDED (CORS)
 from fastapi.middleware.cors import CORSMiddleware
 
 from sqlalchemy.orm import Session
@@ -18,16 +16,10 @@ from models import Base, User, Meter, Reading
 
 app = FastAPI()
 
-# ✅ ADDED (CORS) - para que el Static Site pueda hacer fetch al backend
-# Si no sabes tu dominio exacto del static site, deja "*" por ahora.
+# ✅ CORS (para que el Static Site pueda hacer fetch)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "*"
-        # Si quieres restringirlo después, usa esto en vez de "*":
-        # "https://watermeter-server-1.onrender.com",
-        # "http://localhost:5173",
-    ],
+    allow_origins=["*"],  # luego lo puedes restringir al dominio del frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -64,8 +56,7 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> bool
 # =========================
 class WSManager:
     def __init__(self):
-        # meter_code -> set(websocket)
-        self.active: Dict[str, Set[WebSocket]] = {}
+        self.active: Dict[str, Set[WebSocket]] = {}  # meter_code -> set(websocket)
 
     async def connect(self, meter_code: str, websocket: WebSocket):
         await websocket.accept()
@@ -78,7 +69,6 @@ class WSManager:
                 del self.active[meter_code]
 
     async def broadcast(self, meter_code: str, payload: dict):
-        """Envía JSON a todos los clientes conectados a ese medidor."""
         if meter_code not in self.active:
             return
 
@@ -103,7 +93,7 @@ ws_manager = WSManager()
 async def websocket_endpoint(websocket: WebSocket, meter_code: str):
     await ws_manager.connect(meter_code, websocket)
 
-    # Mensaje inicial en JSON (no rompe tu frontend)
+    # mensaje inicial
     await websocket.send_json({
         "status": "connected",
         "meter_code": meter_code,
@@ -114,7 +104,6 @@ async def websocket_endpoint(websocket: WebSocket, meter_code: str):
     })
 
     try:
-        # Mantener vivo el socket sin depender de receive_text()
         while True:
             await asyncio.sleep(60)
     except WebSocketDisconnect:
@@ -135,7 +124,7 @@ def get_db():
 
 
 # =========================
-# 4) DEMO SEED (opcional)
+# 4) DEMO SEED
 # =========================
 def seed_demo(db: Session):
     admin = db.query(User).filter(User.role == "ADMIN").first()
@@ -145,7 +134,7 @@ def seed_demo(db: Session):
         db.commit()
         db.refresh(admin)
 
-    def ensure_meter(code, pin):
+    def ensure_meter(code: str, pin: str):
         m = db.query(Meter).filter(Meter.meter_code == code).first()
         if not m:
             m = Meter(
@@ -156,7 +145,9 @@ def seed_demo(db: Session):
                 calle="Demo",
                 numero="S/N",
                 predio="",
-                user_id=admin.id
+                user_id=admin.id,
+                price_per_liter=0.50,   # ✅ precio por litro
+                currency="BOB"          # ✅ moneda
             )
             db.add(m)
             db.commit()
@@ -191,13 +182,8 @@ def do_login(meter_code: str = Form(...), pin: str = Form(...), db: Session = De
     return RedirectResponse(url=f"/meter/{m.meter_code}?pin={pin}", status_code=303)
 
 
-# ✅ ADMIN PROTEGIDO: pedirá usuario/contraseña
 @app.get("/admin", response_class=HTMLResponse)
-def admin_page(
-    request: Request,
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_admin)
-):
+def admin_page(request: Request, db: Session = Depends(get_db), _: bool = Depends(require_admin)):
     meters = db.query(Meter).all()
     return templates.TemplateResponse("admin.html", {"request": request, "meters": meters})
 
@@ -241,7 +227,7 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
 
 
 # =========================
-# ✅ ADDED: 5.1) API JSON PARA FRONTEND (DASHBOARD REACT)
+# 5.1) API JSON PARA DASHBOARD
 # =========================
 @app.get("/api/meter/{meter_code}/latest")
 def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
@@ -256,6 +242,11 @@ def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
         .first()
     )
 
+    price = float(getattr(m, "price_per_liter", 0.0) or 0.0)
+    currency = getattr(m, "currency", "BOB") or "BOB"
+    liters_total = float(last.liters_total) if last else 0.0
+    cost_total = round(liters_total * price, 3)
+
     return {
         "meter_code": m.meter_code,
         "category": m.category,
@@ -263,8 +254,11 @@ def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
         "calle": m.calle,
         "numero": m.numero,
         "flow_lps": float(last.flow_lps) if last else 0.0,
-        "liters_total": float(last.liters_total) if last else 0.0,
+        "liters_total": liters_total,
         "timestamp": last.timestamp.strftime("%Y-%m-%d %H:%M:%S") if last else None,
+        "price_per_liter": price,
+        "currency": currency,
+        "cost_total": cost_total,
     }
 
 
@@ -273,6 +267,9 @@ def api_meter_recent(meter_code: str, pin: str, limit: int = 10, db: Session = D
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
     if not m or m.pin != pin:
         raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    price = float(getattr(m, "price_per_liter", 0.0) or 0.0)
+    currency = getattr(m, "currency", "BOB") or "BOB"
 
     rows = (
         db.query(Reading)
@@ -290,10 +287,47 @@ def api_meter_recent(meter_code: str, pin: str, limit: int = 10, db: Session = D
                 "flow_lps": float(r.flow_lps),
                 "liters_delta": float(r.liters_delta),
                 "liters_total": float(r.liters_total),
+                "cost_delta": round(float(r.liters_delta) * price, 3),
+                "cost_total": round(float(r.liters_total) * price, 3),
+                "currency": currency,
             }
             for r in rows
         ],
     }
+
+
+# ✅ Endpoints para ver / cambiar precio
+@app.get("/api/meter/{meter_code}/pricing")
+def api_get_pricing(meter_code: str, pin: str, db: Session = Depends(get_db)):
+    m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
+    if not m or m.pin != pin:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    return {
+        "meter_code": m.meter_code,
+        "price_per_liter": float(getattr(m, "price_per_liter", 0.0) or 0.0),
+        "currency": getattr(m, "currency", "BOB") or "BOB",
+    }
+
+
+@app.post("/api/meter/{meter_code}/pricing")
+def api_set_pricing(
+    meter_code: str,
+    pin: str = Form(...),
+    price_per_liter: float = Form(...),
+    db: Session = Depends(get_db),
+):
+    m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
+    if not m or m.pin != pin:
+        raise HTTPException(status_code=403, detail="Acceso denegado")
+
+    if price_per_liter < 0:
+        raise HTTPException(status_code=400, detail="Precio inválido")
+
+    m.price_per_liter = price_per_liter
+    db.commit()
+
+    return {"status": "ok", "price_per_liter": float(m.price_per_liter)}
 
 
 # =========================
@@ -331,7 +365,5 @@ async def ingest(data: dict, db: Session = Depends(get_db)):
         "timestamp": now.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
-    # push tiempo real
     await ws_manager.broadcast(meter_code, payload)
-
     return {"status": "ok"}
