@@ -3,7 +3,6 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
 
-
 class User(Base):
     __tablename__ = "users"
 
@@ -20,20 +19,17 @@ class Meter(Base):
     __tablename__ = "meters"
 
     id = Column(Integer, primary_key=True)
-    meter_code = Column(String, unique=True)
+    meter_code = Column(String, unique=True, index=True)
     pin = Column(String)
-
     category = Column(String)
     barrio = Column(String)
     calle = Column(String)
     numero = Column(String)
     predio = Column(String)
 
-    # ✅ PRECIOS (opción 1: solo en Meter)
     price_per_liter = Column(Float, default=0.50)
     currency = Column(String, default="BOB")
 
-    # ✅ ForeignKey correcto (SIN links)
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="meters")
 
@@ -48,8 +44,6 @@ class Reading(Base):
     __tablename__ = "readings"
 
     id = Column(Integer, primary_key=True)
-
-    # ✅ ForeignKey correcto (SIN links)
     meter_id = Column(Integer, ForeignKey("meters.id"))
 
     timestamp = Column(DateTime, default=datetime.utcnow)
