@@ -16,7 +16,6 @@ export default function App() {
   const [recent, setRecent] = useState([]);
   const [err, setErr] = useState("");
   const [wsStatus, setWsStatus] = useState("connecting"); // connecting | connected | closed
-
   const wsRef = useRef(null);
 
   // ✅ 1) Carga inicial (1 sola vez): latest + recent
@@ -27,7 +26,6 @@ export default function App() {
     async function initLoad() {
       try {
         setErr("");
-
         const [a, b] = await Promise.all([
           fetch(`${API_BASE}/api/meter/${encodeURIComponent(meter)}/latest?pin=${encodeURIComponent(pin)}`, {
             signal: controller.signal,
@@ -61,7 +59,7 @@ export default function App() {
     };
   }, [meter, pin]);
 
-  // ✅ 2) WebSocket: actualiza cada segundo SIN requests
+  // ✅ 2) WebSocket: actualiza instantáneo (sin requests)
   useEffect(() => {
     setWsStatus("connecting");
     setErr("");
@@ -71,36 +69,46 @@ export default function App() {
 
     ws.onopen = () => setWsStatus("connected");
     ws.onclose = () => setWsStatus("closed");
-
-    ws.onerror = () => {
-      // si WS falla, no mates la app; solo avisa
-      setWsStatus("closed");
-    };
+    ws.onerror = () => setWsStatus("closed");
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
 
-        // Mensaje inicial del servidor trae status=connected
+        // Mensaje inicial del servidor
         if (data.status === "connected") return;
 
-        // Actualiza latest (solo campos de lectura)
-        setLatest((prev) => ({
-          ...(prev || {}),
-          meter_code: meter,
-          flow_lps: Number(data.flow_lps ?? prev?.flow_lps ?? 0),
-          liters_total: Number(data.liters_total ?? prev?.liters_total ?? 0),
-          timestamp: data.timestamp ?? prev?.timestamp ?? null,
-        }));
+        // Calcula costos en frontend usando el precio actual
+        setLatest((prev) => {
+          const price = Number(prev?.price_per_liter ?? 0);
+          const litersTotal = Number(data.liters_total ?? prev?.liters_total ?? 0);
+          const costTotal = Number((litersTotal * price).toFixed(3));
 
-        // Inserta al inicio de la tabla (máx 10 filas)
+          return {
+            ...(prev || {}),
+            meter_code: meter,
+            flow_lps: Number(data.flow_lps ?? prev?.flow_lps ?? 0),
+            liters_total: litersTotal,
+            timestamp: data.timestamp ?? prev?.timestamp ?? null,
+            cost_total: costTotal,
+          };
+        });
+
         setRecent((prev) => {
+          const price = Number(latest?.price_per_liter ?? 0);
+          const litersDelta = Number(data.liters_delta ?? 0);
+          const litersTotal = Number(data.liters_total ?? 0);
+
           const row = {
             timestamp: data.timestamp,
             flow_lps: Number(data.flow_lps ?? 0),
-            liters_delta: Number(data.liters_delta ?? 0),
-            liters_total: Number(data.liters_total ?? 0),
+            liters_delta: litersDelta,
+            liters_total: litersTotal,
+            cost_delta: Number((litersDelta * price).toFixed(3)),
+            cost_total: Number((litersTotal * price).toFixed(3)),
+            currency: latest?.currency ?? "BOB",
           };
+
           const next = [row, ...prev];
           return next.slice(0, 10);
         });
@@ -114,9 +122,9 @@ export default function App() {
         ws.close();
       } catch {}
     };
-  }, [meter]);
+  }, [meter]); // (no ponemos latest aquí para no reconectar WS)
 
-  // ✅ 3) “Reconciliación” opcional: cada 60s actualiza recent (muy bajo consumo)
+  // ✅ 3) Reconciliación cada 60s (por si se pierde algún msg)
   useEffect(() => {
     const t = setInterval(async () => {
       try {
@@ -127,7 +135,7 @@ export default function App() {
         const json = await res.json();
         setRecent(json.recent || []);
       } catch {}
-    }, 60000); // 60s
+    }, 60000);
 
     return () => clearInterval(t);
   }, [meter, pin]);
@@ -140,6 +148,8 @@ export default function App() {
       </div>
     </div>
   );
+
+  const currency = latest?.currency ?? "BOB";
 
   return (
     <div style={{ minHeight: "100vh", background: "#0b1220", color: "#e5e7eb", padding: 22 }}>
@@ -164,9 +174,7 @@ export default function App() {
 
             <div style={{ alignSelf: "center", opacity: 0.9 }}>
               WS:{" "}
-              <b style={{ color: wsStatus === "connected" ? "#22c55e" : "#f97316" }}>
-                {wsStatus}
-              </b>
+              <b style={{ color: wsStatus === "connected" ? "#22c55e" : "#f97316" }}>{wsStatus}</b>
               <div style={{ opacity: 0.8, marginTop: 6 }}>
                 {latest?.timestamp ? `Última actualización: ${latest.timestamp}` : "Sin lecturas aún"}
               </div>
@@ -180,6 +188,7 @@ export default function App() {
           </div>
         )}
 
+        {/* ✅ TARJETAS (incluye precio y costo) */}
         <div
           style={{
             display: "grid",
@@ -190,9 +199,12 @@ export default function App() {
         >
           {card("Flujo actual", latest ? Number(latest.flow_lps ?? 0).toFixed(3) : "0.000", "L/s")}
           {card("Litros acumulados", latest ? Number(latest.liters_total ?? 0).toFixed(3) : "0.000", "L")}
+          {card("Precio", latest ? Number(latest.price_per_liter ?? 0).toFixed(3) : "0.000", `${currency}/L`)}
+          {card("Costo acumulado", latest ? Number(latest.cost_total ?? 0).toFixed(3) : "0.000", currency)}
           {card("Estado", wsStatus === "connected" ? "Conectado" : "Reconectando", wsStatus === "connected" ? "OK" : "...")}
         </div>
 
+        {/* ✅ TABLA con Bs */}
         <div
           style={{
             marginTop: 18,
@@ -205,29 +217,35 @@ export default function App() {
           <div style={{ fontWeight: 900, marginBottom: 10 }}>Lecturas recientes</div>
 
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
               <thead>
                 <tr style={{ textAlign: "left", opacity: 0.8 }}>
                   <th style={{ padding: "10px 8px" }}>Fecha/Hora</th>
                   <th style={{ padding: "10px 8px" }}>Flujo (L/s)</th>
                   <th style={{ padding: "10px 8px" }}>Litros Delta</th>
                   <th style={{ padding: "10px 8px" }}>Litros Total</th>
+                  <th style={{ padding: "10px 8px" }}>Bs Delta</th>
+                  <th style={{ padding: "10px 8px" }}>Bs Total</th>
                 </tr>
               </thead>
+
               <tbody>
                 {recent.length === 0 && (
                   <tr>
-                    <td colSpan={4} style={{ padding: 10, opacity: 0.7 }}>
+                    <td colSpan={6} style={{ padding: 10, opacity: 0.7 }}>
                       Sin lecturas aún…
                     </td>
                   </tr>
                 )}
+
                 {recent.map((r, i) => (
                   <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                     <td style={{ padding: "10px 8px" }}>{r.timestamp}</td>
                     <td style={{ padding: "10px 8px" }}>{Number(r.flow_lps).toFixed(3)}</td>
                     <td style={{ padding: "10px 8px" }}>{Number(r.liters_delta).toFixed(3)}</td>
                     <td style={{ padding: "10px 8px" }}>{Number(r.liters_total).toFixed(3)}</td>
+                    <td style={{ padding: "10px 8px" }}>{Number(r.cost_delta ?? 0).toFixed(3)}</td>
+                    <td style={{ padding: "10px 8px" }}>{Number(r.cost_total ?? 0).toFixed(3)}</td>
                   </tr>
                 ))}
               </tbody>
