@@ -6,7 +6,6 @@
   <title>Panel Usuario</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
-
 <body>
   <div class="wrap">
     <div class="topbar">
@@ -40,6 +39,24 @@
         <h2>Última actualización</h2>
         <div class="big" id="last_ts">{{ last_ts }}</div>
       </div>
+
+      <!-- ✅ NUEVO: precio por litro -->
+      <div class="card">
+        <h2>Precio</h2>
+        <div class="big">
+          <span id="price">{{ "%.3f"|format(price_per_liter) }}</span>
+          <span class="unit">{{ currency }}/L</span>
+        </div>
+      </div>
+
+      <!-- ✅ NUEVO: costo acumulado -->
+      <div class="card">
+        <h2>Costo acumulado</h2>
+        <div class="big">
+          <span id="cost_total">{{ "%.3f"|format(cost_total) }}</span>
+          <span class="unit">{{ currency }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -51,15 +68,19 @@
             <th>Flujo (L/s)</th>
             <th>Litros Delta</th>
             <th>Litros Total</th>
+            <th>Bs Delta</th>
+            <th>Bs Total</th>
           </tr>
         </thead>
         <tbody>
-          {% for r in recent %}
+          {% for r in recent_rows %}
           <tr>
             <td>{{ r.timestamp }}</td>
-            <td>{{ r.flow_lps }}</td>
-            <td>{{ r.liters_delta }}</td>
-            <td>{{ r.liters_total }}</td>
+            <td>{{ "%.3f"|format(r.flow_lps) }}</td>
+            <td>{{ "%.3f"|format(r.liters_delta) }}</td>
+            <td>{{ "%.3f"|format(r.liters_total) }}</td>
+            <td>{{ "%.3f"|format(r.cost_delta) }}</td>
+            <td>{{ "%.3f"|format(r.cost_total) }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -70,21 +91,22 @@
   <!-- WebSocket: actualiza la página sin F5 (compatible con HTTPS/WSS) -->
   <script>
     const meterCode = "{{ meter.meter_code }}";
-
     const elFlow  = document.getElementById("flow");
     const elTotal = document.getElementById("total");
     const elLast  = document.getElementById("last_ts");
     const elWs    = document.getElementById("ws_status");
+
+    // ✅ precio fijo desde backend (para recalcular costo en vivo)
+    const pricePerLiter = Number("{{ price_per_liter }}") || 0;
+    const elCostTotal = document.getElementById("cost_total");
 
     function setWsStatus(txt) {
       if (elWs) elWs.innerText = txt;
     }
 
     function connectWS() {
-      // ✅ Si la página es https -> usamos wss. Si es http -> usamos ws.
       const proto = (window.location.protocol === "https:") ? "wss" : "ws";
       const wsUrl = `${proto}://${window.location.host}/ws/meter/${meterCode}`;
-
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -95,16 +117,22 @@
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-
-          // Ignora el mensaje inicial del servidor
           if (data.status === "connected") return;
 
           if (data.flow_lps !== undefined && elFlow) {
             elFlow.innerText = Number(data.flow_lps).toFixed(3);
           }
+
           if (data.liters_total !== undefined && elTotal) {
-            elTotal.innerText = Number(data.liters_total).toFixed(3);
+            const lt = Number(data.liters_total);
+            elTotal.innerText = lt.toFixed(3);
+
+            // ✅ recalcula costo acumulado en vivo
+            if (elCostTotal) {
+              elCostTotal.innerText = (lt * pricePerLiter).toFixed(3);
+            }
           }
+
           if (data.timestamp && elLast) {
             elLast.innerText = data.timestamp;
           }
@@ -115,15 +143,12 @@
 
       ws.onerror = (e) => {
         console.log("❌ WebSocket error:", e);
-        // fuerza cierre para que dispare reconnect
         try { ws.close(); } catch (_) {}
       };
 
       ws.onclose = () => {
         console.log("🔴 WebSocket desconectado (reintentando...)");
         setWsStatus("WS: 🔴 desconectado (reconectando…)");
-
-        // Reintento en 1 segundo
         setTimeout(connectWS, 1000);
       };
     }
