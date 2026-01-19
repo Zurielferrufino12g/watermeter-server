@@ -11,7 +11,7 @@ class User(Base):
     first_name = Column(String)
     last_name = Column(String)
     phone = Column(String)
-    role = Column(String)  # USER / ADMIN
+    role = Column(String)  # USER / ADMI
 
     meters = relationship("Meter", back_populates="user")
 
