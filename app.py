@@ -19,11 +19,11 @@ from models import Base, User, Meter, Reading
 
 app = FastAPI()
 
-# ✅ CORS (para que el Static Site pueda hacer fetch al backend)
+# ✅ CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # luego puedes restringir al dominio del frontend
-    allow_credentials=True,
+    allow_origins=["*"],   # luego puedes restringir al dominio del frontend
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -74,14 +74,17 @@ class WSManager:
     async def broadcast(self, meter_code: str, payload: dict):
         if meter_code not in self.active:
             return
+
         dead = []
         for ws in list(self.active[meter_code]):
             try:
                 await ws.send_json(payload)
             except Exception:
                 dead.append(ws)
+
         for ws in dead:
             self.disconnect(meter_code, ws)
+
 
 ws_manager = WSManager()
 
@@ -93,7 +96,6 @@ ws_manager = WSManager()
 async def websocket_endpoint(websocket: WebSocket, meter_code: str):
     await ws_manager.connect(meter_code, websocket)
 
-    # Mensaje inicial
     await websocket.send_json({
         "status": "connected",
         "meter_code": meter_code,
@@ -188,6 +190,7 @@ def admin_page(request: Request, db: Session = Depends(get_db), _: bool = Depend
     return templates.TemplateResponse("admin.html", {"request": request, "meters": meters})
 
 
+# ✅ AQUI está la corrección principal para user.html con Bs
 @app.get("/meter/{meter_code}", response_class=HTMLResponse)
 def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depends(get_db)):
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
@@ -213,6 +216,23 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
         .all()
     )
 
+    # ✅ precio y costos para mostrar Bs en user.html
+    price = float(getattr(m, "price_per_liter", 0.0) or 0.0)
+    currency = getattr(m, "currency", "BOB") or "BOB"
+    cost_total = round(liters_total * price, 3)
+
+    # ✅ tabla enriquecida con Bs por fila
+    recent_rows = []
+    for r in recent:
+        recent_rows.append({
+            "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if hasattr(r.timestamp, "strftime") else str(r.timestamp),
+            "flow_lps": float(r.flow_lps),
+            "liters_delta": float(r.liters_delta),
+            "liters_total": float(r.liters_total),
+            "cost_delta": round(float(r.liters_delta) * price, 3),
+            "cost_total": round(float(r.liters_total) * price, 3),
+        })
+
     return templates.TemplateResponse(
         "user.html",
         {
@@ -221,7 +241,14 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
             "flow_lps": flow_lps,
             "liters_total": liters_total,
             "last_ts": last_ts,
-            "recent": recent,
+
+            # ✅ NUEVO (Bs)
+            "price_per_liter": price,
+            "currency": currency,
+            "cost_total": cost_total,
+
+            # ✅ NUEVO (tabla con Bs)
+            "recent_rows": recent_rows,
         },
     )
 
@@ -244,7 +271,6 @@ def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
 
     price = float(getattr(m, "price_per_liter", 0.0) or 0.0)
     currency = getattr(m, "currency", "BOB") or "BOB"
-
     liters_total = float(last.liters_total) if last else 0.0
     cost_total = round(liters_total * price, 3)
 
@@ -322,10 +348,8 @@ def api_set_pricing(
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
     if not m or m.pin != pin:
         raise HTTPException(status_code=403, detail="Acceso denegado")
-
     if price_per_liter < 0:
         raise HTTPException(status_code=400, detail="Precio inválido")
-
     m.price_per_liter = price_per_liter
     db.commit()
     return {"status": "ok", "price_per_liter": float(m.price_per_liter)}
@@ -355,7 +379,6 @@ async def ingest(data: dict, db: Session = Depends(get_db)):
         liters_total=liters_total,
         timestamp=now
     )
-
     db.add(reading)
     db.commit()
 

@@ -40,7 +40,7 @@
         <div class="big" id="last_ts">{{ last_ts }}</div>
       </div>
 
-      <!-- ✅ NUEVO: precio por litro -->
+      <!-- ✅ NUEVO: Precio -->
       <div class="card">
         <h2>Precio</h2>
         <div class="big">
@@ -49,7 +49,7 @@
         </div>
       </div>
 
-      <!-- ✅ NUEVO: costo acumulado -->
+      <!-- ✅ NUEVO: Costo acumulado -->
       <div class="card">
         <h2>Costo acumulado</h2>
         <div class="big">
@@ -96,7 +96,7 @@
     const elLast  = document.getElementById("last_ts");
     const elWs    = document.getElementById("ws_status");
 
-    // ✅ precio fijo desde backend (para recalcular costo en vivo)
+    // ✅ para recalcular costo en vivo
     const pricePerLiter = Number("{{ price_per_liter }}") || 0;
     const elCostTotal = document.getElementById("cost_total");
 
@@ -110,7 +110,6 @@
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log("🟢 WebSocket conectado:", wsUrl);
         setWsStatus("WS: 🟢 conectado");
       };
 
@@ -127,7 +126,7 @@
             const lt = Number(data.liters_total);
             elTotal.innerText = lt.toFixed(3);
 
-            // ✅ recalcula costo acumulado en vivo
+            // ✅ costo acumulado en vivo
             if (elCostTotal) {
               elCostTotal.innerText = (lt * pricePerLiter).toFixed(3);
             }
@@ -141,13 +140,11 @@
         }
       };
 
-      ws.onerror = (e) => {
-        console.log("❌ WebSocket error:", e);
+      ws.onerror = () => {
         try { ws.close(); } catch (_) {}
       };
 
       ws.onclose = () => {
-        console.log("🔴 WebSocket desconectado (reintentando...)");
         setWsStatus("WS: 🔴 desconectado (reconectando…)");
         setTimeout(connectWS, 1000);
       };

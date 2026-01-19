@@ -33,10 +33,10 @@ class Meter(Base):
     price_per_liter = Column(Float, default=0.50)
     currency = Column(String, default="BOB")
 
-    # ✅ ForeignKey correcto
+    # ✅ ForeignKey correcto (SIN links)
     user_id = Column(Integer, ForeignKey("users.id"))
-
     user = relationship("User", back_populates="meters")
+
     readings = relationship(
         "Reading",
         back_populates="meter",
@@ -49,7 +49,7 @@ class Reading(Base):
 
     id = Column(Integer, primary_key=True)
 
-    # ✅ ForeignKey correcto
+    # ✅ ForeignKey correcto (SIN links)
     meter_id = Column(Integer, ForeignKey("meters.id"))
 
     timestamp = Column(DateTime, default=datetime.utcnow)
