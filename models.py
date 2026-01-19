@@ -3,6 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from db import Base
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -31,8 +32,8 @@ class Meter(Base):
     currency = Column(String, default="BOB")
 
     user_id = Column(Integer, ForeignKey("users.id"))
-    user = relationship("User", back_populates="meters")
 
+    user = relationship("User", back_populates="meters")
     readings = relationship(
         "Reading",
         back_populates="meter",
