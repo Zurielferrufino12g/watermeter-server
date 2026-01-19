@@ -1,4 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, Request, Form, WebSocket, WebSocketDisconnect
+from fastapi import (
+    FastAPI, Depends, HTTPException, Request, Form,
+    WebSocket, WebSocketDisconnect
+)
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -16,10 +19,10 @@ from models import Base, User, Meter, Reading
 
 app = FastAPI()
 
-# ✅ CORS (para que el Static Site pueda hacer fetch)
+# ✅ CORS (para que el Static Site pueda hacer fetch al backend)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # luego lo puedes restringir al dominio del frontend
+    allow_origins=["*"],  # luego puedes restringir al dominio del frontend
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,17 +74,14 @@ class WSManager:
     async def broadcast(self, meter_code: str, payload: dict):
         if meter_code not in self.active:
             return
-
         dead = []
         for ws in list(self.active[meter_code]):
             try:
                 await ws.send_json(payload)
             except Exception:
                 dead.append(ws)
-
         for ws in dead:
             self.disconnect(meter_code, ws)
-
 
 ws_manager = WSManager()
 
@@ -93,7 +93,7 @@ ws_manager = WSManager()
 async def websocket_endpoint(websocket: WebSocket, meter_code: str):
     await ws_manager.connect(meter_code, websocket)
 
-    # mensaje inicial
+    # Mensaje inicial
     await websocket.send_json({
         "status": "connected",
         "meter_code": meter_code,
@@ -146,8 +146,8 @@ def seed_demo(db: Session):
                 numero="S/N",
                 predio="",
                 user_id=admin.id,
-                price_per_liter=0.50,   # ✅ precio por litro
-                currency="BOB"          # ✅ moneda
+                price_per_liter=0.50,
+                currency="BOB",
             )
             db.add(m)
             db.commit()
@@ -227,7 +227,7 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
 
 
 # =========================
-# 5.1) API JSON PARA DASHBOARD
+# 5.1) API JSON PARA DASHBOARD (con costos)
 # =========================
 @app.get("/api/meter/{meter_code}/latest")
 def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
@@ -244,6 +244,7 @@ def api_meter_latest(meter_code: str, pin: str, db: Session = Depends(get_db)):
 
     price = float(getattr(m, "price_per_liter", 0.0) or 0.0)
     currency = getattr(m, "currency", "BOB") or "BOB"
+
     liters_total = float(last.liters_total) if last else 0.0
     cost_total = round(liters_total * price, 3)
 
@@ -296,13 +297,14 @@ def api_meter_recent(meter_code: str, pin: str, limit: int = 10, db: Session = D
     }
 
 
-# ✅ Endpoints para ver / cambiar precio
+# =========================
+# 5.2) ENDPOINTS PARA VER / CAMBIAR PRECIO
+# =========================
 @app.get("/api/meter/{meter_code}/pricing")
 def api_get_pricing(meter_code: str, pin: str, db: Session = Depends(get_db)):
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
     if not m or m.pin != pin:
         raise HTTPException(status_code=403, detail="Acceso denegado")
-
     return {
         "meter_code": m.meter_code,
         "price_per_liter": float(getattr(m, "price_per_liter", 0.0) or 0.0),
@@ -326,7 +328,6 @@ def api_set_pricing(
 
     m.price_per_liter = price_per_liter
     db.commit()
-
     return {"status": "ok", "price_per_liter": float(m.price_per_liter)}
 
 
@@ -354,6 +355,7 @@ async def ingest(data: dict, db: Session = Depends(get_db)):
         liters_total=liters_total,
         timestamp=now
     )
+
     db.add(reading)
     db.commit()
 
