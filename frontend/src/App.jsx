@@ -461,7 +461,7 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
           </div>
         </div>
 
-        <div style={{ height: 320, marginTop: 10 }}>
+        <div style={{ height: 320, minHeight: 320, width: "100%", minWidth: 0, marginTop: 10 }}>
           <ResponsiveContainer width="100%" height="100%">
             {period === "week" ? (
               <BarChart data={chartData}>
@@ -673,7 +673,7 @@ function AnalysisView({ latest, recent }) {
               : "Meses (aprox)."}
           </div>
 
-          <div style={{ height: 320, marginTop: 14 }}>
+          <div style={{ height: 320, minHeight: 320, width: "100%", minWidth: 0, marginTop: 14 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#94a3b8", fontSize: 12 }} />
