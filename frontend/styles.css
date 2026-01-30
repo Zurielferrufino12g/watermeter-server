@@ -1,0 +1,77 @@
+
+/* Estilos Globales Premium */
+body {
+  background-color: #000000;
+  color: #e2e8f0;
+  font-family: 'Outfit', sans-serif;
+  margin: 0;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Scrollbars Invisibles */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphism Dinámico */
+.glass-panel {
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(20, 20, 20, 0.8) 0%, rgba(10, 10, 10, 0.9) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Animaciones de Entrada */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-view {
+  animation: slideUpFade 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Efectos de Hover */
+.premium-hover {
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.premium-hover:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 107, 0, 0.3);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* Botones con Resplandor */
+.btn-glow-orange {
+  background: linear-gradient(135deg, #FF6B00 0%, #E65100 100%);
+  box-shadow: 0 8px 16px -4px rgba(255, 107, 0, 0.3);
+  transition: all 0.3s ease;
+}
+.btn-glow-orange:hover {
+  box-shadow: 0 12px 24px -2px rgba(255, 107, 0, 0.5);
+  filter: brightness(1.1);
+}
+
+/* Recharts Customization */
+.recharts-cartesian-grid-horizontal line {
+  stroke: rgba(255, 255, 255, 0.02) !important;
+}
+.recharts-text {
+  font-family: 'Outfit', sans-serif !important;
+  font-weight: 500;
+}
