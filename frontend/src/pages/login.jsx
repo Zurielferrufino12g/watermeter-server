@@ -17,7 +17,7 @@ export default function Login() {
         name: user.displayName,
         email: user.email,
         photo: user.photoURL,
-        role: user.email === "admin@smartwater.com" ? "admin" : "user",
+        role: user.email === "zurielv87@gmail.com" ? "admin" : "user",
       };
 
       localStorage.setItem("smartwater_user", JSON.stringify(userData));
