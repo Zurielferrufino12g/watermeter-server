@@ -2,14 +2,14 @@
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import LoginPage from "./pages/login";
-import DashboardPage from "./pages/Dashboard";
-import AdminPage from "./pages/Admin";
+import Login from "./pages/login";
+import Dashboard from "./pages/Dashboard";
+import Admin from "./pages/Admin";
 
-/* ================= AUTH GUARDS ================= */
 function getToken() {
   return localStorage.getItem("sw_token") || sessionStorage.getItem("sw_token");
 }
+
 function getRole() {
   return localStorage.getItem("sw_role") || sessionStorage.getItem("sw_role");
 }
@@ -23,23 +23,24 @@ function RequireAuth({ children }) {
 function RequireAdmin({ children }) {
   const token = getToken();
   const role = getRole();
+
   if (!token) return <Navigate to="/login" replace />;
   if (role !== "admin") return <Navigate to="/dashboard" replace />;
+
   return children;
 }
 
-/* ================= ROUTES ================= */
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login" element={<Login />} />
 
         <Route
           path="/dashboard"
           element={
             <RequireAuth>
-              <DashboardPage />
+              <Dashboard />
             </RequireAuth>
           }
         />
@@ -48,12 +49,11 @@ export default function App() {
           path="/admin"
           element={
             <RequireAdmin>
-              <AdminPage />
+              <Admin />
             </RequireAdmin>
           }
         />
 
-        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
