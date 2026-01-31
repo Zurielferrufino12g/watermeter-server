@@ -1,4 +1,5 @@
 // frontend/src/pages/Dashboard.jsx
+
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -15,7 +16,7 @@ import {
 /* ================= CONFIG ================= */
 const API_BASE = "https://watermeter-server.onrender.com";
 const WS_BASE = "wss://watermeter-server.onrender.com";
-const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const MONTHS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 /* ================= SETTINGS (LOCAL STORAGE) ================= */
 const SETTINGS_KEY = "smartwater_settings_v1";
@@ -227,7 +228,7 @@ function Sidebar({ activeTab, setActiveTab, onLogout }) {
               fontWeight: 1100,
             }}
           >
-            JP
+            👤
           </div>
           <div style={{ lineHeight: 1.1 }}>
             <div style={{ fontWeight: 1100 }}>Usuario</div>
@@ -377,7 +378,6 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
   const currency = latest?.currency ?? "BOB";
   const price = Number(latest?.price_per_liter ?? 0);
 
-  // Filtrar por periodo (best effort)
   const filtered = useMemo(() => {
     const now = new Date();
     return (recent || []).filter((r) => {
@@ -404,13 +404,13 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
 
   const chartData = useMemo(() => {
     if (period === "week") {
-      const days = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+      const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
       const map = {};
       days.forEach((d) => (map[d] = 0));
       filtered.forEach((r) => {
-        const d = toDate(r.timestamp);
-        if (!d) return;
-        map[days[d.getDay()]] += Number(r.liters_delta ?? 0);
+        const dd = toDate(r.timestamp);
+        if (!dd) return;
+        map[days[dd.getDay()]] += Number(r.liters_delta ?? 0);
       });
       return days.map((d) => ({ name: d, value: Number(map[d].toFixed(3)) }));
     }
@@ -418,21 +418,21 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
     if (period === "month") {
       const map = {};
       filtered.forEach((r) => {
-        const d = toDate(r.timestamp);
-        if (!d) return;
-        const day = d.getDate();
+        const dd = toDate(r.timestamp);
+        if (!dd) return;
+        const day = dd.getDate();
         map[day] = (map[day] || 0) + Number(r.liters_delta ?? 0);
       });
-      const keys = Object.keys(map).map((k) => Number(k)).sort((a,b) => a-b);
+      const keys = Object.keys(map).map((k) => Number(k)).sort((a, b) => a - b);
       return keys.map((k) => ({ name: `D${k}`, value: Number(map[k].toFixed(3)) }));
     }
 
     const map = {};
     MONTHS.forEach((m) => (map[m] = 0));
     filtered.forEach((r) => {
-      const d = toDate(r.timestamp);
-      if (!d) return;
-      map[MONTHS[d.getMonth()]] += Number(r.liters_delta ?? 0);
+      const dd = toDate(r.timestamp);
+      if (!dd) return;
+      map[MONTHS[dd.getMonth()]] += Number(r.liters_delta ?? 0);
     });
     return MONTHS.map((m) => ({ name: m, value: Number(map[m].toFixed(3)) }));
   }, [filtered, period]);
@@ -449,16 +449,13 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
       <GlassCard style={{ marginTop: 18 }}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontWeight: 1100, fontSize: 16 }}>
-              Consumo ({period})
-            </div>
+            <div style={{ fontWeight: 1100, fontSize: 16 }}>Consumo ({period})</div>
             <div style={{ opacity: 0.75, fontSize: 12 }}>
               WS: <b style={{ color: wsStatus === "connected" ? "#22c55e" : "#f97316" }}>{wsStatus}</b> · Flujo: {flowNow.toFixed(3)} L/s
             </div>
           </div>
         </div>
 
-        {/* ✅ Evita warning de recharts con minWidth/minHeight */}
         <div style={{ height: 320, minHeight: 320, width: "100%", minWidth: 0, marginTop: 10 }}>
           <ResponsiveContainer width="100%" height="100%">
             {period === "week" ? (
@@ -469,7 +466,7 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
                   contentStyle={{ backgroundColor: "#0a0a0a", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 16 }}
                   itemStyle={{ color: "#fff", fontSize: 14 }}
                 />
-                <Bar dataKey="value" radius={[12,12,12,12]} barSize={28}>
+                <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={28}>
                   {chartData.map((_, idx) => (
                     <Cell key={idx} fill={idx === 5 ? "#FF6B00" : "rgba(255,255,255,0.10)"} />
                   ))}
@@ -506,6 +503,7 @@ function SettingsView({ settings, setSettings, currentMonth, onSave }) {
       <div style={{ display: "grid", gridTemplateColumns: "360px 1fr", gap: 14, marginTop: 18 }}>
         <GlassCard>
           <div style={{ fontWeight: 1100, marginBottom: 10 }}>Moneda</div>
+
           <div style={{ display: "flex", gap: 10 }}>
             {[
               { code: "BOB", label: "Bolivianos (Bs)" },
@@ -576,16 +574,12 @@ function SettingsView({ settings, setSettings, currentMonth, onSave }) {
               Guardar cambios
             </button>
           </div>
-
-          <div style={{ opacity: 0.65, marginTop: 10, fontSize: 12 }}>
-            Próximo paso: conectar estos settings con GET/PUT en tu backend.
-          </div>
         </GlassCard>
 
         <GlassCard>
           <div style={{ fontWeight: 1100, marginBottom: 8 }}>Idioma (opcional)</div>
           <div style={{ opacity: 0.75, fontSize: 13 }}>
-            Por ahora lo dejamos listo para futuro. Tu app funciona sin esto.
+            Esto queda listo para futuro. No afecta tu dashboard ahora.
           </div>
         </GlassCard>
       </div>
@@ -593,7 +587,7 @@ function SettingsView({ settings, setSettings, currentMonth, onSave }) {
   );
 }
 
-/* ================= PAGE EXPORT ================= */
+/* ================= PAGE (UN SOLO DEFAULT EXPORT) ================= */
 export default function DashboardPage() {
   const nav = useNavigate();
 
@@ -609,6 +603,7 @@ export default function DashboardPage() {
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
   const currentMonth = MONTHS[now.getMonth()];
   const nowLabel = now.toLocaleString("es-BO", {
     weekday: "short",
@@ -631,14 +626,20 @@ export default function DashboardPage() {
   const [toast, setToast] = useState({ show: false, title: "", desc: "" });
 
   const latestRef = useRef(null);
-  useEffect(() => { latestRef.current = latest; }, [latest]);
+  useEffect(() => {
+    latestRef.current = latest;
+  }, [latest]);
 
   // refs para NO reiniciar WS cuando cambian settings/mes
   const settingsRef = useRef(settings);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
 
   const monthRef = useRef(currentMonth);
-  useEffect(() => { monthRef.current = currentMonth; }, [currentMonth]);
+  useEffect(() => {
+    monthRef.current = currentMonth;
+  }, [currentMonth]);
 
   // initial load
   useEffect(() => {
@@ -724,7 +725,9 @@ export default function DashboardPage() {
       };
 
       ws.onerror = () => {
-        try { ws?.close(); } catch {}
+        try {
+          ws?.close();
+        } catch {}
       };
 
       ws.onmessage = (event) => {
@@ -735,12 +738,7 @@ export default function DashboardPage() {
           const s = settingsRef.current;
           const monthNow = monthRef.current;
 
-          const price = Number(
-            s?.monthlyPrice?.[monthNow] ??
-            latestRef.current?.price_per_liter ??
-            0
-          );
-
+          const price = Number(s?.monthlyPrice?.[monthNow] ?? latestRef.current?.price_per_liter ?? 0);
           const currencyLocal = s?.currency === "USD" ? "USD" : "BOB";
 
           setLatest((prev) => {
@@ -789,7 +787,9 @@ export default function DashboardPage() {
     return () => {
       stopped = true;
       if (retryTimer) clearTimeout(retryTimer);
-      try { ws?.close(); } catch {}
+      try {
+        ws?.close();
+      } catch {}
     };
   }, [meter]);
 
@@ -836,7 +836,7 @@ export default function DashboardPage() {
         };
       })
     );
-  }, [settings, currentMonth]); // <- key
+  }, [settings, currentMonth]);
 
   function handleSaveSettings() {
     saveSettings(settings);
@@ -849,10 +849,8 @@ export default function DashboardPage() {
   }
 
   function handleLogout() {
-    // limpia sesión (token/role)
     localStorage.removeItem("sw_token");
     localStorage.removeItem("sw_role");
-    // opcional: también el user de smartwater
     localStorage.removeItem("smartwater_user");
     nav("/login", { replace: true });
   }
@@ -873,13 +871,7 @@ export default function DashboardPage() {
             )}
 
             {activeTab === "dashboard" && (
-              <DashboardView
-                latest={latest}
-                recent={recent}
-                wsStatus={wsStatus}
-                period={period}
-                currentMonth={currentMonth}
-              />
+              <DashboardView latest={latest} recent={recent} wsStatus={wsStatus} period={period} currentMonth={currentMonth} />
             )}
 
             {activeTab === "analysis" && (
@@ -889,12 +881,7 @@ export default function DashboardPage() {
             )}
 
             {activeTab === "settings" && (
-              <SettingsView
-                settings={settings}
-                setSettings={setSettings}
-                currentMonth={currentMonth}
-                onSave={handleSaveSettings}
-              />
+              <SettingsView settings={settings} setSettings={setSettings} currentMonth={currentMonth} onSave={handleSaveSettings} />
             )}
           </div>
         </main>

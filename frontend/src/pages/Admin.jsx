@@ -1,13 +1,7 @@
 // frontend/src/pages/Admin.jsx
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  XAxis,
-  Tooltip,
-} from "recharts";
+import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from "recharts";
 
 const MONTHS = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
 
@@ -187,7 +181,6 @@ function Table({ rows }) {
                       fontWeight: 1100,
                       cursor: "pointer",
                     }}
-                    title="Acción demo"
                     onClick={() => alert(`Demo: ver detalles de ${r.name}`)}
                   >
                     Ver
@@ -239,7 +232,6 @@ export default function AdminPage() {
   }, [rowsAll, q]);
 
   const chart = useMemo(() => {
-    // demo
     return MONTHS.map((m, idx) => ({
       m,
       v: idx < 9 ? 8000 + idx * 2500 : 45000 - (idx - 9) * 4000,
@@ -436,27 +428,9 @@ export default function AdminPage() {
           {section === "dashboard" && (
             <>
               <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(3, minmax(240px, 1fr))", gap: 14 }}>
-                <StatCard
-                  title="Total Usuarios"
-                  value="2,842"
-                  sub="↗ +12.4% este mes"
-                  icon="👤"
-                  accent="#94a3b8"
-                />
-                <StatCard
-                  title="Usuarios Activos"
-                  value="2,190"
-                  sub="Conectados actualmente: 452"
-                  icon="📡"
-                  accent="#ff6b00"
-                />
-                <StatCard
-                  title="Inactivos / Bajas"
-                  value="652"
-                  sub="Requieren revisión técnica"
-                  icon="⛔"
-                  accent="#64748b"
-                />
+                <StatCard title="Total Usuarios" value="2,842" sub="↗ +12.4% este mes" icon="👤" accent="#94a3b8" />
+                <StatCard title="Usuarios Activos" value="2,190" sub="Conectados actualmente: 452" icon="📡" accent="#ff6b00" />
+                <StatCard title="Inactivos / Bajas" value="652" sub="Requieren revisión técnica" icon="⛔" accent="#64748b" />
               </div>
 
               <Glass style={{ marginTop: 14, padding: 18 }}>
@@ -466,16 +440,6 @@ export default function AdminPage() {
                       Tendencia Global de Consumo (m³)
                     </div>
                     <div style={{ opacity: 0.7, fontSize: 12 }}>ANÁLISIS HISTÓRICO 2026</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                    <span style={{ display: "flex", gap: 6, alignItems: "center", opacity: 0.8, fontSize: 12 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 999, background: "rgba(59,130,246,0.9)" }} />
-                      Histórico
-                    </span>
-                    <span style={{ display: "flex", gap: 6, alignItems: "center", opacity: 0.8, fontSize: 12 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: 999, background: "rgba(255,107,0,0.9)" }} />
-                      Mes Actual
-                    </span>
                   </div>
                 </div>
 
@@ -506,77 +470,9 @@ export default function AdminPage() {
             </>
           )}
 
-          {section === "users" && (
-            <div style={{ marginTop: 16 }}>
-              <Table rows={rows} />
-            </div>
-          )}
-
-          {section === "reports" && (
-            <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
-              <Glass style={{ padding: 18 }}>
-                <div style={{ fontWeight: 1300, fontSize: 18 }}>Centro de Reportes</div>
-                <div style={{ opacity: 0.75, marginTop: 6 }}>
-                  Aquí iremos conectando generación de PDF/XLSX desde backend.
-                </div>
-              </Glass>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14 }}>
-                <Glass style={{ padding: 18 }}>
-                  <div style={{ fontWeight: 1200 }}>Eficiencia_Mensual_OCT_2026.pdf</div>
-                  <div style={{ opacity: 0.7, marginTop: 6 }}>Formato: PDF · 2.4 MB</div>
-                  <button
-                    onClick={() => alert("Demo: descargar")}
-                    style={{
-                      marginTop: 12,
-                      padding: "12px 14px",
-                      borderRadius: 14,
-                      border: "1px solid rgba(255,107,0,0.25)",
-                      background: "rgba(255,107,0,0.90)",
-                      color: "#fff",
-                      fontWeight: 1200,
-                      cursor: "pointer",
-                      width: "100%",
-                    }}
-                  >
-                    Descargar
-                  </button>
-                </Glass>
-
-                <Glass style={{ padding: 18 }}>
-                  <div style={{ fontWeight: 1200 }}>Registro_Alertas_Fugas_Q3.xlsx</div>
-                  <div style={{ opacity: 0.7, marginTop: 6 }}>Formato: XLSX · 1.1 MB</div>
-                  <button
-                    onClick={() => alert("Demo: descargar")}
-                    style={{
-                      marginTop: 12,
-                      padding: "12px 14px",
-                      borderRadius: 14,
-                      border: "1px solid rgba(255,107,0,0.25)",
-                      background: "rgba(255,107,0,0.90)",
-                      color: "#fff",
-                      fontWeight: 1200,
-                      cursor: "pointer",
-                      width: "100%",
-                    }}
-                  >
-                    Descargar
-                  </button>
-                </Glass>
-              </div>
-            </div>
-          )}
-
-          {section === "config" && (
-            <div style={{ marginTop: 16 }}>
-              <Glass style={{ padding: 18 }}>
-                <div style={{ fontWeight: 1300, fontSize: 18 }}>Configuración</div>
-                <div style={{ opacity: 0.75, marginTop: 6 }}>
-                  Aquí va: reglas, distritos, planes, precios globales, permisos de usuarios, etc.
-                </div>
-              </Glass>
-            </div>
-          )}
+          {section === "users" && <div style={{ marginTop: 16 }}><Table rows={rows} /></div>}
+          {section === "reports" && <div style={{ marginTop: 16 }}><Glass style={{ padding: 18 }}>Centro de Reportes (demo)</Glass></div>}
+          {section === "config" && <div style={{ marginTop: 16 }}><Glass style={{ padding: 18 }}>Configuración (demo)</Glass></div>}
         </main>
       </div>
     </div>
