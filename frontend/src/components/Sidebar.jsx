@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AppView } from '../types';
+import { AppView } from '../../types';
 
 const Sidebar = ({ currentView, setView }) => {
   const navItems = [

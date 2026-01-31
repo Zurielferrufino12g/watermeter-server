@@ -1,82 +1,62 @@
-import React from "react";
+// src/pages/login.jsx
+import React, { useState } from "react";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { auth } from "../auth/firebase"; // ✅ RUTA CORRECTA
 import { useNavigate } from "react-router-dom";
-import { auth, googleProvider } from "../auth/firebase";
-import { signInWithPopup } from "firebase/auth";
 
-export default function Login() {
-  const navigate = useNavigate();
+export default function LoginPage() {
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");
+  const [pass, setPass] = useState("");
+  const [err, setErr] = useState("");
 
-  const handleGoogleLogin = async () => {
+  async function onLogin(e) {
+    e.preventDefault();
+    setErr("");
+
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const cred = await signInWithEmailAndPassword(auth, email, pass);
 
-      // Guardamos datos mínimos del usuario
-      const userData = {
-        uid: user.uid,
-        name: user.displayName,
-        email: user.email,
-        photo: user.photoURL,
-        role: user.email === "zurielv87@gmail.com" ? "admin" : "user",
-      };
+      // 🔐 token Firebase
+      const idToken = await cred.user.getIdToken();
 
-      localStorage.setItem("smartwater_user", JSON.stringify(userData));
+      // 👤 role (temporal)
+      const role = email.includes("admin") ? "admin" : "user";
 
-      // Redirección según rol
-      if (userData.role === "admin") {
-        navigate("/admin");
-      } else {
-        navigate("/dashboard");
-      }
-    } catch (error) {
-      console.error("Error al iniciar sesión:", error);
-      alert("Error al iniciar sesión con Google");
+      localStorage.setItem("sw_token", idToken);
+      localStorage.setItem("sw_role", role);
+
+      nav(role === "admin" ? "/admin" : "/dashboard", { replace: true });
+    } catch (e2) {
+      setErr(e2.message || "Error al iniciar sesión");
     }
-  };
+  }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "grid",
-        placeItems: "center",
-        background: "radial-gradient(circle at top, #ff8c1a, #000)",
-      }}
-    >
-      <div
-        style={{
-          width: 380,
-          padding: 28,
-          borderRadius: 22,
-          background: "rgba(0,0,0,0.65)",
-          border: "1px solid rgba(255,255,255,0.15)",
-          color: "#fff",
-          textAlign: "center",
-        }}
-      >
-        <h2>Bienvenido</h2>
-        <p style={{ opacity: 0.75 }}>
-          Inicia sesión en tu panel inteligente
-        </p>
+    <div style={{ padding: 30, color: "#fff" }}>
+      <h2>Login</h2>
 
-        <button
-          onClick={handleGoogleLogin}
-          style={{
-            marginTop: 20,
-            width: "100%",
-            padding: "14px",
-            borderRadius: 14,
-            border: "none",
-            background: "#ff6b00",
-            color: "#fff",
-            fontWeight: 900,
-            fontSize: 16,
-            cursor: "pointer",
-          }}
-        >
-          Continuar con Google
-        </button>
-      </div>
+      <form
+        onSubmit={onLogin}
+        style={{ display: "grid", gap: 10, maxWidth: 320 }}
+      >
+        <input
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="email"
+        />
+
+        <input
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          placeholder="password"
+          type="password"
+        />
+
+        <button type="submit">Entrar</button>
+
+        {err && <div style={{ color: "tomato" }}>{err}</div>}
+      </form>
     </div>
   );
 }
