@@ -1,4 +1,3 @@
-// frontend/src/App.jsx
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -7,11 +6,11 @@ import Dashboard from "./pages/Dashboard";
 import Admin from "./pages/Admin";
 
 function getToken() {
-  return localStorage.getItem("sw_token") || sessionStorage.getItem("sw_token");
+  return localStorage.getItem("sw_token");
 }
 
 function getRole() {
-  return localStorage.getItem("sw_role") || sessionStorage.getItem("sw_role");
+  return localStorage.getItem("sw_role");
 }
 
 function RequireAuth({ children }) {
