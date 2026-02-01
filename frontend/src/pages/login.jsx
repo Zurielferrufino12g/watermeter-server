@@ -22,7 +22,12 @@ export default function LoginPage() {
       const idToken = await cred.user.getIdToken();
 
       // 👤 role (temporal, por texto en el email)
-      const role = email.toLowerCase().includes("admin") ? "admin" : "user";
+      const role = {
+      "email": "zurielv87@gmail.com",
+      "role": "admin",
+      "active": true
+      }
+
 
       localStorage.setItem("sw_token", idToken);
       localStorage.setItem("sw_role", role);
