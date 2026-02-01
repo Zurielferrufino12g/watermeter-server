@@ -1,9 +1,11 @@
+// frontend/src/auth/firebase.js
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 /**
- * ✅ Config Firebase CLIENT (para React/Vite)
- * Estas variables deben estar en frontend/.env con prefijo VITE_
+ * Config Firebase CLIENT (React/Vite)
+ * Variables en frontend/.env (prefijo VITE_)
  */
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,14 +17,14 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // opcional
 };
 
-// ✅ Inicializa Firebase una sola vez
 const app = initializeApp(firebaseConfig);
 
-// ✅ Auth instance
+// Auth
 export const auth = getAuth(app);
 
-// ✅ Provider Google
+// Google provider (si lo usas luego)
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: "select_account", // fuerza a elegir cuenta
-});
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
+// Firestore ✅
+export const db = getFirestore(app);

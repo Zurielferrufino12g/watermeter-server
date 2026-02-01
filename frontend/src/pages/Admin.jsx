@@ -1,7 +1,19 @@
 // frontend/src/pages/Admin.jsx
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from "recharts";
+
+import {
+  collection,
+  addDoc,
+  onSnapshot,
+  query,
+  orderBy,
+  serverTimestamp,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+import { db } from "../auth/firebase";
 
 const MONTHS = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
 
@@ -98,10 +110,165 @@ function StatCard({ title, value, sub, icon, accent = "#ff6b00" }) {
   );
 }
 
-function Table({ rows }) {
+function AddUserModal({ open, onClose, onCreate }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [meterId, setMeterId] = useState("");
+  const [plan, setPlan] = useState("Básico Hogar");
+  const [status, setStatus] = useState("ACTIVO");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    setName(""); setEmail(""); setMeterId("");
+    setPlan("Básico Hogar"); setStatus("ACTIVO");
+    setErr("");
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        display: "grid",
+        placeItems: "center",
+        zIndex: 9999,
+        padding: 18,
+      }}
+      onMouseDown={onClose}
+    >
+      <div
+        style={{
+          width: 520,
+          maxWidth: "100%",
+          borderRadius: 22,
+          border: "1px solid rgba(255,255,255,0.10)",
+          background: "rgba(10,12,16,0.92)",
+          backdropFilter: "blur(10px)",
+          boxShadow: "0 30px 90px rgba(0,0,0,0.55)",
+          padding: 18,
+          color: "#fff",
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+          <div style={{ fontWeight: 1300, fontSize: 18 }}>Añadir Usuario</div>
+          <button
+            onClick={onClose}
+            style={{ border: 0, background: "transparent", color: "rgba(255,255,255,0.7)", cursor: "pointer", fontSize: 18 }}
+            title="Cerrar"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Nombre (ej: Carlos Mendoza)"
+            style={inputStyle}
+          />
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email (ej: carlos.m@example.com)"
+            style={inputStyle}
+          />
+          <input
+            value={meterId}
+            onChange={(e) => setMeterId(e.target.value)}
+            placeholder="ID Medidor (ej: SW-2026-001)"
+            style={inputStyle}
+          />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <select value={plan} onChange={(e) => setPlan(e.target.value)} style={inputStyle}>
+              <option>Básico Hogar</option>
+              <option>Básico Social</option>
+              <option>Residencial Premium</option>
+              <option>Comercial Estándar</option>
+              <option>Industrial Premium</option>
+            </select>
+
+            <select value={status} onChange={(e) => setStatus(e.target.value)} style={inputStyle}>
+              <option value="ACTIVO">ACTIVO</option>
+              <option value="INACTIVO">INACTIVO</option>
+              <option value="HISTÓRICO">HISTÓRICO</option>
+            </select>
+          </div>
+
+          {err && <div style={{ color: "tomato", fontWeight: 900 }}>{err}</div>}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 6 }}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.10)",
+                background: "rgba(255,255,255,0.07)",
+                color: "#fff",
+                fontWeight: 1100,
+                cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+
+            <button
+              onClick={async () => {
+                setErr("");
+                if (!name.trim()) return setErr("Falta nombre");
+                if (!email.trim()) return setErr("Falta email");
+                if (!meterId.trim()) return setErr("Falta ID medidor");
+
+                await onCreate({
+                  name: name.trim(),
+                  email: email.trim(),
+                  meterId: meterId.trim(),
+                  plan,
+                  status,
+                });
+                onClose();
+              }}
+              style={{
+                padding: "12px 14px",
+                borderRadius: 14,
+                border: "1px solid rgba(255,107,0,0.25)",
+                background: "rgba(255,107,0,0.90)",
+                color: "#fff",
+                fontWeight: 1200,
+                cursor: "pointer",
+              }}
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const inputStyle = {
+  width: "100%",
+  padding: "12px 12px",
+  borderRadius: 14,
+  border: "1px solid rgba(255,255,255,0.10)",
+  background: "rgba(255,255,255,0.06)",
+  color: "#fff",
+  fontWeight: 900,
+  outline: "none",
+};
+
+function UsersTable({ rows, onDelete }) {
   return (
     <Glass style={{ padding: 18 }}>
-      <div style={{ fontWeight: 1200, fontSize: 16, marginBottom: 12 }}>Gestión de Usuarios</div>
+      <div style={{ fontWeight: 1200, fontSize: 16, marginBottom: 12 }}>Gestión de Usuarios (Firestore)</div>
 
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 900 }}>
@@ -116,8 +283,16 @@ function Table({ rows }) {
           </thead>
 
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={5} style={{ padding: 14, opacity: 0.75 }}>
+                  No hay usuarios aún. Usa “+ Añadir Usuario”.
+                </td>
+              </tr>
+            )}
+
+            {rows.map((r) => (
+              <tr key={r.id} style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
                 <td style={{ padding: "12px 10px" }}>
                   <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                     <div
@@ -132,7 +307,12 @@ function Table({ rows }) {
                         fontWeight: 1100,
                       }}
                     >
-                      {r.initials}
+                      {(r.name || "U")
+                        .split(" ")
+                        .slice(0, 2)
+                        .map((w) => w[0])
+                        .join("")
+                        .toUpperCase()}
                     </div>
                     <div>
                       <div style={{ fontWeight: 1100 }}>{r.name}</div>
@@ -156,9 +336,7 @@ function Table({ rows }) {
                   </span>
                 </td>
 
-                <td style={{ padding: "12px 10px", opacity: 0.9 }}>
-                  {r.plan}
-                </td>
+                <td style={{ padding: "12px 10px", opacity: 0.9 }}>{r.plan}</td>
 
                 <td style={{ padding: "12px 10px" }}>
                   {r.status === "ACTIVO" ? (
@@ -170,7 +348,7 @@ function Table({ rows }) {
                   )}
                 </td>
 
-                <td style={{ padding: "12px 10px" }}>
+                <td style={{ padding: "12px 10px", display: "flex", gap: 10 }}>
                   <button
                     style={{
                       padding: "10px 12px",
@@ -181,9 +359,24 @@ function Table({ rows }) {
                       fontWeight: 1100,
                       cursor: "pointer",
                     }}
-                    onClick={() => alert(`Demo: ver detalles de ${r.name}`)}
+                    onClick={() => alert(`Demo: ver ${r.name}`)}
                   >
                     Ver
+                  </button>
+
+                  <button
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: 14,
+                      border: "1px solid rgba(255,0,0,0.20)",
+                      background: "rgba(255,0,0,0.12)",
+                      color: "#fff",
+                      fontWeight: 1100,
+                      cursor: "pointer",
+                    }}
+                    onClick={() => onDelete(r.id)}
+                  >
+                    Eliminar
                   </button>
                 </td>
               </tr>
@@ -193,7 +386,7 @@ function Table({ rows }) {
       </div>
 
       <div style={{ marginTop: 14, opacity: 0.7, fontSize: 12 }}>
-        *Esto es UI demo. Luego lo conectamos a tu backend.
+        *Ahora sí son datos reales en Firestore.
       </div>
     </Glass>
   );
@@ -203,40 +396,53 @@ export default function AdminPage() {
   const nav = useNavigate();
   const [section, setSection] = useState("dashboard"); // dashboard | users | reports | config
   const [q, setQ] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
 
-  const user = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("smartwater_user") || "null");
-    } catch {
-      return null;
-    }
+  const [users, setUsers] = useState([]); // datos reales
+
+  // ✅ escuchar Firestore en tiempo real
+  useEffect(() => {
+    const qUsers = query(collection(db, "users"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(
+      qUsers,
+      (snap) => {
+        const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setUsers(rows);
+      },
+      (err) => {
+        console.error("Firestore error:", err);
+      }
+    );
+    return () => unsub();
   }, []);
-
-  const rowsAll = useMemo(
-    () => [
-      { initials: "CM", name: "Carlos Mendoza", email: "carlos.m@example.com", meterId: "SW-2026-001", plan: "Residencial Premium", status: "ACTIVO" },
-      { initials: "ER", name: "Elena Rivas", email: "elena.rivas@work.com", meterId: "SW-2026-042", plan: "Básico Hogar", status: "ACTIVO" },
-      { initials: "JT", name: "Julián Torres", email: "j.torres_hist@provider.net", meterId: "SW-2026-089", plan: "Comercial Estándar", status: "HISTÓRICO" },
-      { initials: "SL", name: "Sofía Luna", email: "sofia.luna@cloud.com", meterId: "SW-2026-115", plan: "Industrial Premium", status: "ACTIVO" },
-      { initials: "MP", name: "Marcos Peña", email: "m.pena88@webmail.com", meterId: "SW-2026-203", plan: "Básico Social", status: "INACTIVO" },
-    ],
-    []
-  );
 
   const rows = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return rowsAll;
-    return rowsAll.filter((r) =>
-      [r.name, r.email, r.meterId, r.plan, r.status].some((x) => String(x).toLowerCase().includes(t))
+    if (!t) return users;
+    return users.filter((r) =>
+      [r.name, r.email, r.meterId, r.plan, r.status].some((x) => String(x || "").toLowerCase().includes(t))
     );
-  }, [rowsAll, q]);
+  }, [users, q]);
 
   const chart = useMemo(() => {
+    // demo (luego lo conectamos)
     return MONTHS.map((m, idx) => ({
       m,
       v: idx < 9 ? 8000 + idx * 2500 : 45000 - (idx - 9) * 4000,
     }));
   }, []);
+
+  async function createUser(user) {
+    await addDoc(collection(db, "users"), {
+      ...user,
+      createdAt: serverTimestamp(),
+    });
+  }
+
+  async function deleteUser(id) {
+    if (!confirm("¿Eliminar usuario?")) return;
+    await deleteDoc(doc(db, "users", id));
+  }
 
   function logout() {
     localStorage.removeItem("sw_token");
@@ -317,26 +523,6 @@ export default function AdminPage() {
           </div>
 
           <div style={{ position: "absolute", left: 18, right: 18, bottom: 18, display: "grid", gap: 10 }}>
-            <Glass style={{ padding: 12, display: "flex", gap: 10, alignItems: "center" }}>
-              <div
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 999,
-                  background: "rgba(255,255,255,0.10)",
-                  display: "grid",
-                  placeItems: "center",
-                  fontWeight: 1200,
-                }}
-              >
-                {user?.name ? user.name.split(" ").slice(0, 2).map((w) => w[0]).join("") : "AD"}
-              </div>
-              <div style={{ lineHeight: 1.1 }}>
-                <div style={{ fontWeight: 1200 }}>{user?.name || "Admin Principal"}</div>
-                <div style={{ fontSize: 11, opacity: 0.7 }}>{user?.email || "admin@smartwater.com"}</div>
-              </div>
-            </Glass>
-
             <button
               onClick={logout}
               style={{
@@ -380,7 +566,7 @@ export default function AdminPage() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  placeholder="Buscar reportes, usuarios..."
+                  placeholder="Buscar usuarios..."
                   style={{
                     width: "100%",
                     border: 0,
@@ -393,7 +579,7 @@ export default function AdminPage() {
               </div>
 
               <button
-                onClick={() => alert("Demo: abrir modal 'Añadir Usuario'")}
+                onClick={() => setModalOpen(true)}
                 style={{
                   padding: "12px 16px",
                   borderRadius: 14,
@@ -406,21 +592,6 @@ export default function AdminPage() {
               >
                 + Añadir Usuario
               </button>
-
-              <div
-                style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 14,
-                  display: "grid",
-                  placeItems: "center",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  background: "rgba(255,255,255,0.06)",
-                }}
-                title="Notificaciones (demo)"
-              >
-                🔔
-              </div>
             </div>
           </div>
 
@@ -428,22 +599,26 @@ export default function AdminPage() {
           {section === "dashboard" && (
             <>
               <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "repeat(3, minmax(240px, 1fr))", gap: 14 }}>
-                <StatCard title="Total Usuarios" value="2,842" sub="↗ +12.4% este mes" icon="👤" accent="#94a3b8" />
-                <StatCard title="Usuarios Activos" value="2,190" sub="Conectados actualmente: 452" icon="📡" accent="#ff6b00" />
-                <StatCard title="Inactivos / Bajas" value="652" sub="Requieren revisión técnica" icon="⛔" accent="#64748b" />
+                <StatCard title="Total Usuarios" value={String(users.length)} sub="Firestore (tiempo real)" icon="👤" accent="#94a3b8" />
+                <StatCard
+                  title="Usuarios Activos"
+                  value={String(users.filter((u) => u.status === "ACTIVO").length)}
+                  sub="Estado = ACTIVO"
+                  icon="📡"
+                  accent="#ff6b00"
+                />
+                <StatCard
+                  title="Inactivos / Hist"
+                  value={String(users.filter((u) => u.status !== "ACTIVO").length)}
+                  sub="INACTIVO o HISTÓRICO"
+                  icon="⛔"
+                  accent="#64748b"
+                />
               </div>
 
               <Glass style={{ marginTop: 14, padding: 18 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-                  <div>
-                    <div style={{ fontWeight: 1200, fontSize: 16 }}>
-                      Tendencia Global de Consumo (m³)
-                    </div>
-                    <div style={{ opacity: 0.7, fontSize: 12 }}>ANÁLISIS HISTÓRICO 2026</div>
-                  </div>
-                </div>
-
-                <div style={{ height: 340, minHeight: 340, width: "100%", minWidth: 0, marginTop: 12 }}>
+                <div style={{ fontWeight: 1200, fontSize: 16 }}>Tendencia Global (demo)</div>
+                <div style={{ height: 240, minHeight: 240, width: "100%", minWidth: 0, marginTop: 12 }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chart}>
                       <defs>
@@ -465,16 +640,38 @@ export default function AdminPage() {
               </Glass>
 
               <div style={{ marginTop: 14 }}>
-                <Table rows={rows} />
+                <UsersTable rows={rows} onDelete={deleteUser} />
               </div>
             </>
           )}
 
-          {section === "users" && <div style={{ marginTop: 16 }}><Table rows={rows} /></div>}
-          {section === "reports" && <div style={{ marginTop: 16 }}><Glass style={{ padding: 18 }}>Centro de Reportes (demo)</Glass></div>}
-          {section === "config" && <div style={{ marginTop: 16 }}><Glass style={{ padding: 18 }}>Configuración (demo)</Glass></div>}
+          {section === "users" && (
+            <div style={{ marginTop: 16 }}>
+              <UsersTable rows={rows} onDelete={deleteUser} />
+            </div>
+          )}
+
+          {section === "reports" && (
+            <div style={{ marginTop: 16 }}>
+              <Glass style={{ padding: 18 }}>
+                <div style={{ fontWeight: 1300, fontSize: 18 }}>Reportes</div>
+                <div style={{ opacity: 0.75, marginTop: 6 }}>Luego conectamos con backend.</div>
+              </Glass>
+            </div>
+          )}
+
+          {section === "config" && (
+            <div style={{ marginTop: 16 }}>
+              <Glass style={{ padding: 18 }}>
+                <div style={{ fontWeight: 1300, fontSize: 18 }}>Configuración</div>
+                <div style={{ opacity: 0.75, marginTop: 6 }}>Luego: roles, planes, permisos, etc.</div>
+              </Glass>
+            </div>
+          )}
         </main>
       </div>
+
+      <AddUserModal open={modalOpen} onClose={() => setModalOpen(false)} onCreate={createUser} />
     </div>
   );
 }
