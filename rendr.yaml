@@ -1,10 +1,5 @@
-services:
-  - type: static
-    name: watermeter-frontend
-    rootDir: frontend
-    buildCommand: npm run build
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
+"scripts": {
+  "dev": "vite",
+  "build": "vite build && cp public/_redirects dist/_redirects",
+  "preview": "vite preview"
+}
