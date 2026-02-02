@@ -7,6 +7,6 @@ export default defineConfig({
   publicDir: "public",
   build: {
     outDir: "dist",
-    emptyOutDir: true, // ✅ deja esto en true
+    emptyOutDir: true, // ✅ deja esto en tru
   },
 });
