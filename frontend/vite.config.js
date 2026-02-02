@@ -3,9 +3,10 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  publicDir: "public", // ✅ ESTA LÍNEA ES LA CLAVE
+  // publicDir por defecto ya es "public", pero lo dejamos explícito:
+  publicDir: "public",
   build: {
     outDir: "dist",
-    emptyOutDir: true,
+    emptyOutDir: true, // ✅ deja esto en true
   },
 });
