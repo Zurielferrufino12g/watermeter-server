@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
+// ✅ Vite SOLO lee variables que empiecen con VITE_
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -12,10 +13,13 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // opcional
 };
 
+// ✅ Inicializar Firebase
 const app = initializeApp(firebaseConfig);
 
+// ✅ Servicios
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// ✅ Google Provider
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
