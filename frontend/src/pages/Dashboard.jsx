@@ -23,14 +23,10 @@ export default function Dashboard() {
     };
 
     ws.onmessage = (e) => {
-      try {
-        const data = JSON.parse(e.data);
-        setLastMsg(data);
-
-        // Ejemplo de mensajes esperados
-        if (data.type === "meter") {
-          setFlow(data.flow ?? 0);
-          setLiters(data.liters ?? 0);
+      const data = JSON.parse(e.data);
+  // Ignorar ping
+      if (data.type === "ping") return;
+      console.log("📩 WS data:", data);
         }
 
         if (data.type === "ping") {
