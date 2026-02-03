@@ -1,4 +1,4 @@
-mport { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 
 const WS_URL = "wss://watermeter-server.onrender.com/ws/meter/MED-001A";
 
