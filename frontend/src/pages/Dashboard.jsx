@@ -26,17 +26,20 @@ export default function Dashboard() {
       try {
         const data = JSON.parse(e.data);
 
-  // Ignorar ping
-  if (data.type === "ping") return;
+        // Guardar el último mensaje para verlo en pantalla
+        setLastMsg(data);
 
-  console.log("📩 WS data:", data);
-        }
+        // Ignorar ping (solo latido)
+        if (data.type === "ping") return;
 
-        if (data.type === "ping") {
-          console.log("💓 ping");
-        }
+        console.log("📩 WS data:", data);
+
+        // 👇 Ajusta estos campos según lo que realmente mande tu backend
+        if (typeof data.flow_lps === "number") setFlow(data.flow_lps);
+        if (typeof data.total_liters === "number") setLiters(data.total_liters);
+
       } catch (err) {
-        console.error("❌ Error parseando WS", err);
+        console.error("❌ Error parseando WS", err, e.data);
       }
     };
 
@@ -53,15 +56,14 @@ export default function Dashboard() {
       console.log("🔌 Cerrando WS");
       ws.close();
     };
-  }, []); // IMPORTANTE: solo una vez
+  }, []);
 
   return (
     <div style={{ padding: 20 }}>
       <h1>📊 Water Meter Dashboard</h1>
 
       <p>
-        Estado:
-        {connected ? " 🟢 Conectado" : " 🔴 Desconectado"}
+        Estado: {connected ? "🟢 Conectado" : "🔴 Desconectado"}
       </p>
 
       <hr />
