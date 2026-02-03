@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const WS_URL = "wss://watermeter-server.onrender.com/ws/meter/MED-001A";
+const WS_URL = "wss://watermeter-fapi.onrender.com/ws/meter/MED-001A";
 
 export default function Dashboard() {
   const wsRef = useRef(null);
