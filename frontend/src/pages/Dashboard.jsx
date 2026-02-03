@@ -23,10 +23,13 @@ export default function Dashboard() {
     };
 
     ws.onmessage = (e) => {
-      const data = JSON.parse(e.data);
+      try {
+        const data = JSON.parse(e.data);
+
   // Ignorar ping
-      if (data.type === "ping") return;
-      console.log("📩 WS data:", data);
+  if (data.type === "ping") return;
+
+  console.log("📩 WS data:", data);
         }
 
         if (data.type === "ping") {
