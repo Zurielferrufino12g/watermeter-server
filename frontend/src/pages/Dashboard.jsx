@@ -61,7 +61,8 @@ export default function App() {
     </BrowserRouter>
   );
 }
- 
+ 
+
 // frontend/src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -77,9 +78,9 @@ import {
 } from "recharts";
 
 /* ================= CONFIG =================
-   IMPORTANTE:
-   - NO uses links tipo [texto](url) dentro de strings.
-   - Deben ser URLs planas (sin Markdown), porque WebSocket() y fetch() no entienden Markdown.
+  IMPORTANTE:
+  - NO uses links tipo [texto](url) dentro de strings.
+ - Deben ser URLs planas (sin Markdown), porque WebSocket() y fetch() no entienden Markdown.
 */
 const API_BASE = "https://watermeter-server.onrender.com";
 const WS_BASE  = "wss://watermeter-server.onrender.com";
@@ -727,7 +728,7 @@ export default function Dashboard() {
 
   const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
 
-  /* -------- REST: fetch latest + recent -------- */
+  /*8 -------- REST: fetch latest + recent -------- */
   async function fetchLatest() {
     const url = `${API_BASE}/api/meter/${encodeURIComponent(meterCode)}/latest`;
     const res = await fetch(url, { method: "GET", headers: { ...authHeaders } });
@@ -768,9 +769,9 @@ export default function Dashboard() {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      setWsStatus("connected");
-      setToast({ show: true, title: "WebSocket conectado", desc: `Medidor: ${meterCode}` });
-      console.log("✅ WebSocket conectado:", wsUrl);
+    setWsStatus("connected");
+    setToast({ show: true, title: "WebSocket conectado", desc: `Medidor: ${meterCode}` });
+    console.log("✅ WebSocket conectado:", wsUrl);
     };
 
     ws.onmessage = (e) => {
