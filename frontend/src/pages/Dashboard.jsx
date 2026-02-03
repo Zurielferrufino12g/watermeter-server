@@ -78,8 +78,8 @@ import {
 } from "recharts";
 
 /* ================= CONFIG =================
-   OJO: NO uses links tipo [texto](url) dentro de strings.
-   Deben ser URLs planas, porque WebSocket() y fetch() no entienden Markdown.
+    OJO: NO uses links tipo [texto](url) dentro de strings.
+    Deben ser URLs planas, porque WebSocket() y fetch() no entienden Markdown.
 */
 const API_BASE = "https://watermeter-server.onrender.com";
 const WS_BASE  = "wss://watermeter-server.onrender.com";
@@ -453,7 +453,7 @@ function MetricCard({ label, value, sub, accent = "#2563EB" }) {
         }}
       />
       <div style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", opacity: 0.7, fontWeight: 900 }}>
-        {label}
+ 8       {label}
       </div>
       <div style={{ marginTop: 10, fontSize: 28, fontWeight: 900, lineHeight: 1.1 }}>{value}</div>
       <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>{sub}</div>
@@ -491,7 +491,7 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
   const flowNow = clampNum(latest?.flow_lps, 0);
   const litersTotal = clampNum(latest?.liters_total, 0);
   const costTotal = clampNum(latest?.cost_total, litersTotal * price);
-
+8
   const chartData = useMemo(() => {
     if (period === "week") {
       const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -602,7 +602,7 @@ function AnalysisView({ recent }) {
       <GlassCard>
         <div style={{ fontWeight: 1100, fontSize: 16, marginBottom: 8 }}>Últimos eventos (debug)</div>
         <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 12 }}>
-          Muestra los últimos registros del backend para ver si llegan litros_delta y flow_lps.
+        Muestra los últimos registros del backend para ver si llegan litros_delta y flow_lps.
         </div>
         <pre style={{ background: "#0b0f14", color: "#9ae6b4", padding: 14, borderRadius: 14, overflow: "auto" }}>
 {JSON.stringify(recent?.slice(0, 30) || [], null, 2)}
