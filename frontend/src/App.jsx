@@ -6,7 +6,7 @@ import LoginPage from "./pages/login";
 import DashboardPage from "./pages/Dashboard";
 import AdminPage from "./pages/Admin";
 
-/* ================= AUTH GUARDS ================= */
+/* ================= AUTH HELPERS ================= */
 function getToken() {
   return localStorage.getItem("sw_token") || sessionStorage.getItem("sw_token");
 }
@@ -14,6 +14,7 @@ function getRole() {
   return localStorage.getItem("sw_role") || sessionStorage.getItem("sw_role");
 }
 
+/* ================= GUARDS ================= */
 function RequireAuth({ children }) {
   const token = getToken();
   if (!token) return <Navigate to="/login" replace />;
@@ -23,8 +24,30 @@ function RequireAuth({ children }) {
 function RequireAdmin({ children }) {
   const token = getToken();
   const role = getRole();
+
   if (!token) return <Navigate to="/login" replace />;
+
+  // Si no hay role aún, manda a dashboard (o podrías mandar a /login)
+  // pero lo ideal es que el login SIEMPRE guarde sw_role.
   if (role !== "admin") return <Navigate to="/dashboard" replace />;
+
+  return children;
+}
+
+/* ✅ Ruta inteligente: decide según token + role */
+function HomeRedirect() {
+  const token = getToken();
+  const role = getRole();
+
+  if (!token) return <Navigate to="/login" replace />;
+  if (role === "admin") return <Navigate to="/admin" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
+/* ✅ Opcional: si admin intenta entrar a dashboard, lo mandamos a admin */
+function DashboardRedirectIfAdmin({ children }) {
+  const role = getRole();
+  if (role === "admin") return <Navigate to="/admin" replace />;
   return children;
 }
 
@@ -39,7 +62,9 @@ export default function App() {
           path="/dashboard"
           element={
             <RequireAuth>
-              <DashboardPage />
+              <DashboardRedirectIfAdmin>
+                <DashboardPage />
+              </DashboardRedirectIfAdmin>
             </RequireAuth>
           }
         />
@@ -53,9 +78,12 @@ export default function App() {
           }
         />
 
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* ✅ Cambiamos el "/" para que te mande al lugar correcto */}
+        <Route path="/" element={<HomeRedirect />} />
+
+        {/* ✅ Y los 404 también */}
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </BrowserRouter>
   );
-}
+} 
