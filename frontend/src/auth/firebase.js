@@ -1,9 +1,8 @@
-// src/firebase.js
-import { initializeApp, getApps, getApp } from "firebase/app";
+import { initializeApp, getApps } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
-// ✅ Config desde variables de entorno de Vite (Render las inyecta en build)
+// Configuración usando variables de entorno (Vite)
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -11,12 +10,10 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-
-  // opcional (solo si tienes Analytics)
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID, // opcional
 };
 
-// ✅ Validación: si falta algo, te lo dice y NO deja pantalla en blanco
+// Validación clara (evita pantalla en blanco)
 const requiredKeys = [
   "apiKey",
   "authDomain",
@@ -26,27 +23,26 @@ const requiredKeys = [
   "appId",
 ];
 
-const missing = requiredKeys.filter((k) => {
-  const v = firebaseConfig[k];
-  return !v || (typeof v === "string" && v.trim() === "");
-});
+const missing = requiredKeys.filter((key) => !firebaseConfig[key]);
 
 if (missing.length > 0) {
-  console.error("❌ Firebase config incompleta. Faltan:", missing);
-  console.error(
-    "➡️ Revisa que las variables existan en Render (FRONTEND) y haz 'Clear build cache' + redeploy."
+  console.error("❌ Firebase config incompleta");
+  console.error("Faltan estas variables:", missing);
+  throw new Error(
+    `Firebase config incompleta. Revisa variables VITE_ en Render: ${missing.join(
+      ", "
+    )}`
   );
-
-  // Lanza error claro para que lo veas en consola (y no quede en blanco sin explicación)
-  throw new Error(`Firebase config incompleta: ${missing.join(", ")}`);
 }
 
-// ✅ Evita doble inicialización (Vite hot reload / React strict mode)
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// Evita doble inicialización
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// ✅ Exportaciones listas para usar
+// Exportaciones
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
 export const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({ prompt: "select_account" });
+googleProvider.setCustomParameters({
+  prompt: "select_account",
+});
