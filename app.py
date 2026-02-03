@@ -17,18 +17,19 @@ from typing import Dict, Set
 from db import engine, SessionLocal
 from models import Base, User, Meter, Reading
 
+
 app = FastAPI()
 
-# ✅ CORS
+# ✅ CORS (para desarrollo está OK con "*")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # luego puedes restringir al dominio del frontend
+    allow_origins=["*"],
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Static + Templates
+# Static + Templates (si existen esas carpetas)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
@@ -59,7 +60,7 @@ def require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> bool
 # =========================
 class WSManager:
     def __init__(self):
-        self.active: Dict[str, Set[WebSocket]] = {}  # meter_code -> set(websocket)
+        self.active: Dict[str, Set[WebSocket]] = {}  # meter_code -> set(ws)
 
     async def connect(self, meter_code: str, websocket: WebSocket):
         await websocket.accept()
@@ -74,17 +75,14 @@ class WSManager:
     async def broadcast(self, meter_code: str, payload: dict):
         if meter_code not in self.active:
             return
-
         dead = []
         for ws in list(self.active[meter_code]):
             try:
                 await ws.send_json(payload)
             except Exception:
                 dead.append(ws)
-
         for ws in dead:
             self.disconnect(meter_code, ws)
-
 
 ws_manager = WSManager()
 
@@ -96,8 +94,9 @@ ws_manager = WSManager()
 async def websocket_endpoint(websocket: WebSocket, meter_code: str):
     await ws_manager.connect(meter_code, websocket)
 
+    # Mensaje inicial
     await websocket.send_json({
-        "status": "connected",
+        "type": "connected",
         "meter_code": meter_code,
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "flow_lps": 0.0,
@@ -106,8 +105,14 @@ async def websocket_endpoint(websocket: WebSocket, meter_code: str):
     })
 
     try:
+        # ✅ keep-alive: evita que Render cierre el WS por "idle"
         while True:
-            await asyncio.sleep(60)
+            await websocket.send_json({
+                "type": "ping",
+                "ts": datetime.now().isoformat()
+            })
+            await asyncio.sleep(25)
+
     except WebSocketDisconnect:
         ws_manager.disconnect(meter_code, websocket)
     except Exception:
@@ -169,7 +174,7 @@ def startup_event():
 
 
 # =========================
-# 5) WEB ROUTES
+# 5) WEB ROUTES (HTML)
 # =========================
 @app.get("/", response_class=HTMLResponse)
 def login_page(request: Request, err: str = ""):
@@ -177,7 +182,11 @@ def login_page(request: Request, err: str = ""):
 
 
 @app.post("/login")
-def do_login(meter_code: str = Form(...), pin: str = Form(...), db: Session = Depends(get_db)):
+def do_login(
+    meter_code: str = Form(...),
+    pin: str = Form(...),
+    db: Session = Depends(get_db)
+):
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
     if not m or m.pin != pin:
         return RedirectResponse(url="/?err=1", status_code=303)
@@ -185,12 +194,15 @@ def do_login(meter_code: str = Form(...), pin: str = Form(...), db: Session = De
 
 
 @app.get("/admin", response_class=HTMLResponse)
-def admin_page(request: Request, db: Session = Depends(get_db), _: bool = Depends(require_admin)):
+def admin_page(
+    request: Request,
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_admin)
+):
     meters = db.query(Meter).all()
     return templates.TemplateResponse("admin.html", {"request": request, "meters": meters})
 
 
-# ✅ AQUI está la corrección principal para user.html con Bs
 @app.get("/meter/{meter_code}", response_class=HTMLResponse)
 def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depends(get_db)):
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
@@ -216,16 +228,14 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
         .all()
     )
 
-    # ✅ precio y costos para mostrar Bs en user.html
     price = float(getattr(m, "price_per_liter", 0.0) or 0.0)
     currency = getattr(m, "currency", "BOB") or "BOB"
     cost_total = round(liters_total * price, 3)
 
-    # ✅ tabla enriquecida con Bs por fila
     recent_rows = []
     for r in recent:
         recent_rows.append({
-            "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S") if hasattr(r.timestamp, "strftime") else str(r.timestamp),
+            "timestamp": r.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "flow_lps": float(r.flow_lps),
             "liters_delta": float(r.liters_delta),
             "liters_total": float(r.liters_total),
@@ -241,13 +251,9 @@ def meter_page(request: Request, meter_code: str, pin: str, db: Session = Depend
             "flow_lps": flow_lps,
             "liters_total": liters_total,
             "last_ts": last_ts,
-
-            # ✅ NUEVO (Bs)
             "price_per_liter": price,
             "currency": currency,
             "cost_total": cost_total,
-
-            # ✅ NUEVO (tabla con Bs)
             "recent_rows": recent_rows,
         },
     )
@@ -331,6 +337,7 @@ def api_get_pricing(meter_code: str, pin: str, db: Session = Depends(get_db)):
     m = db.query(Meter).filter(Meter.meter_code == meter_code).first()
     if not m or m.pin != pin:
         raise HTTPException(status_code=403, detail="Acceso denegado")
+
     return {
         "meter_code": m.meter_code,
         "price_per_liter": float(getattr(m, "price_per_liter", 0.0) or 0.0),
@@ -350,6 +357,7 @@ def api_set_pricing(
         raise HTTPException(status_code=403, detail="Acceso denegado")
     if price_per_liter < 0:
         raise HTTPException(status_code=400, detail="Precio inválido")
+
     m.price_per_liter = price_per_liter
     db.commit()
     return {"status": "ok", "price_per_liter": float(m.price_per_liter)}
@@ -377,12 +385,13 @@ async def ingest(data: dict, db: Session = Depends(get_db)):
         flow_lps=flow_lps,
         liters_delta=liters_delta,
         liters_total=liters_total,
-        timestamp=now
+        timestamp=now,
     )
     db.add(reading)
     db.commit()
 
     payload = {
+        "type": "reading",
         "meter_code": meter_code,
         "flow_lps": flow_lps,
         "liters_delta": liters_delta,
