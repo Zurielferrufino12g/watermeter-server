@@ -61,8 +61,7 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
-frontend/src/pages/Dashboard.jsx
+ 
 // frontend/src/pages/Dashboard.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -78,8 +77,9 @@ import {
 } from "recharts";
 
 /* ================= CONFIG =================
-    OJO: NO uses links tipo [texto](url) dentro de strings.
-    Deben ser URLs planas, porque WebSocket() y fetch() no entienden Markdown.
+   IMPORTANTE:
+   - NO uses links tipo [texto](url) dentro de strings.
+   - Deben ser URLs planas (sin Markdown), porque WebSocket() y fetch() no entienden Markdown.
 */
 const API_BASE = "https://watermeter-server.onrender.com";
 const WS_BASE  = "wss://watermeter-server.onrender.com";
@@ -112,6 +112,11 @@ function loadSettings() {
 
 function saveSettings(s) {
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+}
+
+/* ================= AUTH (token helper) ================= */
+function getToken() {
+  return localStorage.getItem("sw_token") || sessionStorage.getItem("sw_token");
 }
 
 /* ================= HELPERS ================= */
@@ -453,7 +458,7 @@ function MetricCard({ label, value, sub, accent = "#2563EB" }) {
         }}
       />
       <div style={{ fontSize: 12, letterSpacing: 1, textTransform: "uppercase", opacity: 0.7, fontWeight: 900 }}>
- 8       {label}
+        {label}
       </div>
       <div style={{ marginTop: 10, fontSize: 28, fontWeight: 900, lineHeight: 1.1 }}>{value}</div>
       <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>{sub}</div>
@@ -491,7 +496,7 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
   const flowNow = clampNum(latest?.flow_lps, 0);
   const litersTotal = clampNum(latest?.liters_total, 0);
   const costTotal = clampNum(latest?.cost_total, litersTotal * price);
-8
+
   const chartData = useMemo(() => {
     if (period === "week") {
       const days = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -586,7 +591,13 @@ function DashboardView({ latest, recent, wsStatus, period, currentMonth }) {
                     color: "#fff",
                   }}
                 />
-                <Area type="monotone" dataKey="value" stroke="rgba(255,107,0,0.9)" fill="rgba(255,107,0,0.25)" strokeWidth={2} />
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="rgba(255,107,0,0.9)"
+                  fill="rgba(255,107,0,0.25)"
+                  strokeWidth={2}
+                />
               </AreaChart>
             )}
           </ResponsiveContainer>
@@ -600,9 +611,9 @@ function AnalysisView({ recent }) {
   return (
     <div style={{ marginTop: 10 }}>
       <GlassCard>
-        <div style={{ fontWeight: 1100, fontSize: 16, marginBottom: 8 }}>Últimos eventos (debug)</div>
+        <div style={{ fontWeight: 1100, fontSize: 16, marginBottom: 8 }}>Ultimos eventos (debug)</div>
         <div style={{ opacity: 0.7, fontSize: 12, marginBottom: 12 }}>
-        Muestra los últimos registros del backend para ver si llegan litros_delta y flow_lps.
+          Muestra los ultimos registros del backend para ver si llegan liters_delta y flow_lps.
         </div>
         <pre style={{ background: "#0b0f14", color: "#9ae6b4", padding: 14, borderRadius: 14, overflow: "auto" }}>
 {JSON.stringify(recent?.slice(0, 30) || [], null, 2)}
@@ -711,14 +722,19 @@ export default function Dashboard() {
   // price_per_liter comes from settings (month-based)
   const priceForMonth = clampNum(settings.monthlyPrice[monthLabel], 0);
 
+  // auth token (si tu API lo requiere)
+  const token = getToken();
+
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+
   /* -------- REST: fetch latest + recent -------- */
   async function fetchLatest() {
     const url = `${API_BASE}/api/meter/${encodeURIComponent(meterCode)}/latest`;
-    const res = await fetch(url, { method: "GET" });
+    const res = await fetch(url, { method: "GET", headers: { ...authHeaders } });
     if (!res.ok) throw new Error(`latest ${res.status}`);
     const data = await res.json();
 
-    // asegura campos mínimos para UI
+    // asegura campos minimos para UI
     return {
       ...data,
       currency: settings.currency,
@@ -730,7 +746,7 @@ export default function Dashboard() {
   async function fetchRecent() {
     // si no existe en tu backend, puedes borrar esto sin problema
     const url = `${API_BASE}/api/meter/${encodeURIComponent(meterCode)}/recent?limit=500`;
-    const res = await fetch(url, { method: "GET" });
+    const res = await fetch(url, { method: "GET", headers: { ...authHeaders } });
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : [];
@@ -738,9 +754,11 @@ export default function Dashboard() {
 
   /* -------- WS connect -------- */
   function connectWS() {
-    const wsUrl = `${WS_BASE}/ws/meter/${encodeURIComponent(meterCode)}`;
+    // si el backend protege el WS con token, suele ir por query param: ?token=...
+    const tokenQuery = token ? `?token=${encodeURIComponent(token)}` : "";
+    const wsUrl = `${WS_BASE}/ws/meter/${encodeURIComponent(meterCode)}${tokenQuery}`;
 
-    // cerrar si ya había uno
+    // cerrar si ya habia uno
     if (wsRef.current) {
       try { wsRef.current.close(); } catch {}
       wsRef.current = null;
@@ -765,30 +783,21 @@ export default function Dashboard() {
         // guarda reciente “last message” dentro de recent (modo debug)
         setRecent((prev) => [data, ...prev].slice(0, 500));
 
-        // si viene tipo connected o tiene métricas, actualiza “latest”
-        if (data?.type === "connected") {
-          setLatest((prev) => ({
-            ...(prev || {}),
+        // actualiza latest de forma segura (evita "stale state")
+        setLatest((prev) => {
+          const base = prev || {};
+          const next = {
+            ...base,
             ...data,
             currency: settings.currency,
             price_per_liter: priceForMonth,
-          }));
-          return;
-        }
+          };
 
-        // normal: payload con flow_lps / liters_total / liters_delta
-        const nextLatest = {
-          ...(latest || {}),
-          ...data,
-          currency: settings.currency,
-          price_per_liter: priceForMonth,
-        };
+          const litersTotal = clampNum(next.liters_total, clampNum(base.liters_total, 0));
+          next.cost_total = litersTotal * priceForMonth;
 
-        // recalcula costo total si hay litros_total
-        const litersTotal = clampNum(nextLatest.liters_total, clampNum(latest?.liters_total, 0));
-        nextLatest.cost_total = litersTotal * priceForMonth;
-
-        setLatest(nextLatest);
+          return next;
+        });
       } catch (err) {
         console.error("❌ Error parseando WS:", err);
       }
